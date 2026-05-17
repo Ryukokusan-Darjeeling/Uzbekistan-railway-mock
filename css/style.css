@@ -1,0 +1,10 @@
+/* ============================================
+   中吉乌铁路经济模拟器 — 主样式入口
+   通过 @import 引入各模块样式
+   ============================================ */
+
+@import url('base.css');
+@import url('components.css');
+@import url('map.css');
+@import url('advisor.css');
+@import url('animations.css');

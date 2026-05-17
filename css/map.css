@@ -1,0 +1,112 @@
+/* ============================================
+   地图样式 — map.css
+   Map Section, Stations, Train, Leaflet Popup
+   ============================================ */
+
+.map-section {
+  min-height: 480px;
+  position: relative;
+  overflow: hidden;
+}
+
+#railway-map {
+  width: 100%;
+  height: 480px;
+  border-radius: 12px;
+  z-index: 1;
+}
+
+.map-legend {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 1000;
+  background: rgba(10, 14, 26, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+}
+
+.map-legend h4 {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.legend-color {
+  width: 20px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+/* Train & Station Markers */
+.train-marker {
+  font-size: 22px;
+  filter: drop-shadow(0 0 6px rgba(102, 126, 234, 0.6));
+  animation: trainPulse 2s ease-in-out infinite;
+}
+
+@keyframes trainPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.station-marker {
+  width: 14px;
+  height: 14px;
+  background: var(--accent-1);
+  border: 3px solid var(--text-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgba(102, 126, 234, 0.5);
+}
+
+/* Leaflet Custom Popup */
+.leaflet-popup-content-wrapper {
+  background: rgba(17, 24, 39, 0.95) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-glass) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-primary) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(17, 24, 39, 0.95) !important;
+  border: 1px solid var(--border-glass) !important;
+}
+
+.leaflet-popup-content {
+  margin: 14px 16px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.85rem !important;
+}
+
+.popup-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+  color: var(--accent-1);
+}
+
+.popup-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.popup-stat:last-child { border-bottom: none; }
+.popup-stat .label { color: var(--text-muted); }
+.popup-stat .value { font-weight: 600; }

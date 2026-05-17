@@ -1,0 +1,278 @@
+/* ============================================
+   动画与响应式 — animations.css
+   Loading, Animations, Toast, Responsive,
+   Algorithm Info Section
+   ============================================ */
+
+/* ---- Animations ---- */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in { animation: fadeInUp 0.6s ease forwards; }
+.animate-in:nth-child(1) { animation-delay: 0.05s; }
+.animate-in:nth-child(2) { animation-delay: 0.1s; }
+.animate-in:nth-child(3) { animation-delay: 0.15s; }
+.animate-in:nth-child(4) { animation-delay: 0.2s; }
+
+.value-flash { animation: flash 0.6s ease; }
+
+@keyframes flash {
+  0% { opacity: 0.4; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ---- Loading Overlay ---- */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.5s ease;
+}
+
+.loading-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-train {
+  font-size: 48px;
+  animation: trainMove 2s ease-in-out infinite;
+}
+
+@keyframes trainMove {
+  0%, 100% { transform: translateX(-30px); }
+  50% { transform: translateX(30px); }
+}
+
+.loading-text {
+  margin-top: 20px;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.loading-bar {
+  width: 200px;
+  height: 3px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--gradient-main);
+  border-radius: 2px;
+  animation: loadProgress 1.5s ease forwards;
+}
+
+@keyframes loadProgress { to { width: 100%; } }
+
+/* ---- Notification Toast ---- */
+.toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  padding: 14px 24px;
+  background: rgba(17, 24, 39, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-weight: 500;
+  z-index: 10000;
+  transform: translateX(120%);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow-card);
+}
+
+.toast.show { transform: translateX(0); }
+.toast.success { border-left: 4px solid var(--accent-3); }
+.toast.error { border-left: 4px solid var(--accent-red); }
+.toast.info { border-left: 4px solid var(--accent-1); }
+
+/* ---- Algorithm Info Section ---- */
+.algorithm-section { margin-bottom: 20px; }
+
+.algorithm-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.algo-block {
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+.algo-block:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.algo-block h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.algo-block h3 .algo-icon {
+  font-size: 1.2rem;
+}
+
+.algo-block.baseline h3 { color: var(--accent-1); }
+.algo-block.ai-algo h3 { color: var(--accent-3); }
+
+.algo-block p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 10px;
+}
+
+.algo-formula {
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(102, 126, 234, 0.15);
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.82rem;
+  color: var(--accent-cyan);
+  margin: 10px 0;
+  overflow-x: auto;
+  line-height: 1.8;
+}
+
+.algo-list {
+  list-style: none;
+  padding: 0;
+}
+
+.algo-list li {
+  padding: 6px 0;
+  font-size: 0.83rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.algo-list li:last-child { border-bottom: none; }
+
+.algo-list .bullet {
+  color: var(--accent-1);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.algo-block.ai-algo .algo-list .bullet {
+  color: var(--accent-3);
+}
+
+.algo-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-right: 6px;
+}
+
+.algo-tag.deterministic {
+  background: rgba(102, 126, 234, 0.12);
+  color: var(--accent-1);
+  border: 1px solid rgba(102, 126, 234, 0.25);
+}
+
+.algo-tag.stochastic {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--accent-orange);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.algo-tag.ai {
+  background: rgba(6, 214, 160, 0.12);
+  color: var(--accent-3);
+  border: 1px solid rgba(6, 214, 160, 0.25);
+}
+
+.algo-divider {
+  grid-column: 1 / -1;
+  border: none;
+  border-top: 1px solid var(--border-glass);
+  margin: 4px 0;
+}
+
+.algo-summary {
+  grid-column: 1 / -1;
+  padding: 18px 24px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.06), rgba(118, 75, 162, 0.06));
+  border: 1px solid rgba(102, 126, 234, 0.15);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+.algo-summary strong {
+  color: var(--text-primary);
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1100px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .stats-panel {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .algorithm-content { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .app-container { padding: 12px; }
+  .header {
+    padding: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .header-center { width: 100%; flex-wrap: wrap; }
+  .charts-grid { grid-template-columns: 1fr; }
+  .stats-panel { grid-template-columns: 1fr; }
+  .stat-value { font-size: 1.4rem; }
+  #railway-map { height: 350px; }
+  .algorithm-content { grid-template-columns: 1fr; }
+}
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
