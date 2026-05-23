@@ -17,12 +17,12 @@ class UIManager {
   updateDateDisplay() {
     const dateEl = document.getElementById('simDate');
     if (dateEl) {
-      dateEl.textContent = this.sim.getCurrentDateStr();
+      dateEl.textContent = i18n.formatDate(this.sim.currentYear, this.sim.currentMonth);
     }
 
     const monthCountEl = document.getElementById('monthCount');
     if (monthCountEl) {
-      monthCountEl.textContent = `第 ${this.sim.getTotalMonths()} 个月`;
+      monthCountEl.textContent = i18n.t('header.monthCount', this.sim.getTotalMonths());
     }
   }
 
@@ -52,7 +52,8 @@ class UIManager {
     }
 
     // Volume
-    this._animateValue('totalVolume', latest.totalVolume, '', '吨');
+    const volUnit = i18n.t('stat.volume.unit');
+    this._animateValue('totalVolume', latest.totalVolume, '', volUnit);
   }
 
   _animateValue(elementId, targetValue, prefix = '', suffix = '') {
@@ -71,6 +72,8 @@ class UIManager {
 
     const latest = this.sim.getLatestMonthData();
     const previous = this.sim.getPreviousMonthData();
+    const tonUnit = i18n.t('cargo.unit.ton');
+    const perTonUnit = i18n.t('cargo.unit.perTon');
 
     let html = '';
     CARGO_TYPES.forEach(cargo => {
@@ -88,17 +91,18 @@ class UIManager {
 
       // Show AI adjustment indicator
       const aiTag = data.aiAdjusted ? '<span class="ai-adjusted-tag">AI</span>' : '';
+      const localName = i18n.cargoName(cargo.id);
 
       html += `
         <tr>
           <td>
             <span class="cargo-badge ${cargo.id}">
-              ${cargo.emoji} ${cargo.name}
+              ${cargo.emoji} ${localName}
             </span>
             ${aiTag}
           </td>
-          <td>${formatNumber(data.volume)} 吨</td>
-          <td>$${data.price.toLocaleString()}/吨</td>
+          <td>${formatNumber(data.volume)}${tonUnit}</td>
+          <td>$${data.price.toLocaleString()}${perTonUnit}</td>
           <td style="font-weight:600">$${formatNumber(data.revenue)}</td>
           <td class="${trendClass}" style="font-weight:600">${trendStr}</td>
         </tr>
@@ -121,11 +125,12 @@ class UIManager {
         const isIncrease = multiplier > 1;
         const sign = isIncrease ? '+' : '';
         const colorClass = isIncrease ? 'adj-increase' : 'adj-decrease';
+        const localName = i18n.cargoName(cargo.id);
 
         html += `
           <div class="adjustment-item ${colorClass}">
             <span class="adj-emoji">${cargo.emoji}</span>
-            <span class="adj-name">${cargo.name}</span>
+            <span class="adj-name">${localName}</span>
             <span class="adj-value">${sign}${pctChange}%</span>
             <span class="adj-arrow">${isIncrease ? '↑' : '↓'}</span>
           </div>
@@ -134,7 +139,7 @@ class UIManager {
     });
 
     if (!html) {
-      html = '<div class="text-muted" style="padding:12px">暂无调控参数</div>';
+      html = `<div class="text-muted" style="padding:12px">${i18n.t('ai.adjustments.empty')}</div>`;
     }
 
     grid.innerHTML = html;
@@ -149,19 +154,22 @@ class UIManager {
     if (!region) return;
 
     const regionData = monthData.regionRevenue[regionId];
+    const localRegionName = i18n.regionName(regionId);
+    const localRegionDesc = i18n.regionDesc(regionId);
 
     let cargoBreakdownHTML = '';
     CARGO_TYPES.forEach(cargo => {
       const cargoRev = Math.round(monthData.cargo[cargo.id].revenue * region.revenueShare);
+      const localName = i18n.cargoName(cargo.id);
       cargoBreakdownHTML += `
         <div class="region-stat">
-          <div class="label">${cargo.emoji} ${cargo.name}</div>
+          <div class="label">${cargo.emoji} ${localName}</div>
           <div class="value" style="color:${cargo.color}">$${formatNumber(cargoRev)}</div>
         </div>
       `;
     });
 
-    document.getElementById('regionTitle').innerHTML = `${region.emoji} ${region.name} — ${region.description}`;
+    document.getElementById('regionTitle').innerHTML = `${region.emoji} ${localRegionName} — ${localRegionDesc}`;
     document.getElementById('regionDistance').textContent = region.distance;
     document.getElementById('regionRevenue').textContent = `$${formatNumber(regionData.revenue)}`;
     document.getElementById('regionShare').textContent = `${(region.revenueShare * 100).toFixed(0)}%`;
@@ -185,9 +193,8 @@ class UIManager {
         <div class="comparison-notice">
           <span class="icon">💡</span>
           <div>
-            <strong>暂无 AI 调控数据</strong><br>
-            <span class="text-muted">请先获取 AI 建议并开启 AI 调控开关，然后推进月份以查看对比效果。
-            目前显示的两条线完全重叠，因为所有月份均未采纳 AI 建议。</span>
+            <strong>${i18n.t('comparison.noData.title')}</strong><br>
+            <span class="text-muted">${i18n.t('comparison.noData.desc')}</span>
           </div>
         </div>
       `;
@@ -204,19 +211,19 @@ class UIManager {
     summaryEl.innerHTML = `
       <div class="comparison-stats-grid">
         <div class="comp-stat">
-          <div class="comp-label">AI 调控月数</div>
-          <div class="comp-value">${aiMonths.length} 个月</div>
+          <div class="comp-label">${i18n.t('comparison.stat.months')}</div>
+          <div class="comp-value">${aiMonths.length}${i18n.t('comparison.stat.months.unit')}</div>
         </div>
         <div class="comp-stat">
-          <div class="comp-label">AI 调控期间总收益</div>
+          <div class="comp-label">${i18n.t('comparison.stat.aiRevenue')}</div>
           <div class="comp-value" style="color:#06d6a0">$${formatNumber(totalActual)}</div>
         </div>
         <div class="comp-stat">
-          <div class="comp-label">同期基线收益</div>
+          <div class="comp-label">${i18n.t('comparison.stat.baseRevenue')}</div>
           <div class="comp-value" style="color:#667eea">$${formatNumber(totalBaseline)}</div>
         </div>
         <div class="comp-stat ${isPositive ? 'positive' : 'negative'}">
-          <div class="comp-label">AI 调控增益</div>
+          <div class="comp-label">${i18n.t('comparison.stat.gain')}</div>
           <div class="comp-value">
             ${isPositive ? '↑' : '↓'} ${isPositive ? '+' : ''}$${formatNumber(diff)}
             <span class="comp-pct">(${isPositive ? '+' : ''}${pct}%)</span>

@@ -48,7 +48,7 @@ class CargoAdvisor {
         messages: [
           {
             role: 'system',
-            content: '你是一个专业的铁路货物调度顾问，精通中吉乌铁路（中国-吉尔吉斯斯坦-乌兹别克斯坦铁路）的货物运输市场。你需要根据当前数据，为下个月的货物调度提供具体、可操作的建议。回复请使用中文，格式清晰，分点列出建议。'
+            content: i18n.t('advisor.prompt.system')
           },
           {
             role: 'user',
@@ -66,7 +66,7 @@ class CargoAdvisor {
     }
 
     const data = await response.json();
-    const aiText = data.choices?.[0]?.message?.content || '无法获取建议';
+    const aiText = data.choices?.[0]?.message?.content || '无法获取建议 / Unable to get advice';
 
     return {
       source: 'AI (Groq / Llama 3.1)',
@@ -77,11 +77,14 @@ class CargoAdvisor {
 
   _buildPrompt(summary) {
     let cargoInfo = '';
-    summary.cargoPerformance.forEach((c, i) => {
-      cargoInfo += `${i + 1}. ${c.name} (${c.nameEn}): 收益 $${formatNumber(c.revenue)}, 运量 ${formatNumber(c.volume)}吨, 环比趋势 ${c.trend}\n`;
-    });
+    const isZH = i18n.lang === 'zh';
+    
+    if (isZH) {
+      summary.cargoPerformance.forEach((c, i) => {
+        cargoInfo += `${i + 1}. ${c.name} (${c.nameEn}): 收益 $${formatNumber(c.revenue)}, 运量 ${formatNumber(c.volume)}吨, 环比趋势 ${c.trend}\n`;
+      });
 
-    return `
+      return `
 当前模拟日期：${summary.currentDate}
 累计总收益：$${formatNumber(summary.totalRevenue)}
 本月总收益：$${formatNumber(summary.monthRevenue)}
@@ -97,10 +100,34 @@ ${cargoInfo}
 3. 预计下月市场趋势分析
 4. 具体调度策略建议（包括建议运量调整百分比）
 `;
+    } else {
+      summary.cargoPerformance.forEach((c, i) => {
+        cargoInfo += `${i + 1}. ${c.nameEn}: Revenue $${formatNumber(c.revenue)}, Volume ${formatNumber(c.volume)} tons, MoM Trend ${c.trend}\n`;
+      });
+
+      const nextMonthName = MONTH_NAMES_EN[summary.nextMonthIndex];
+
+      return `
+Current Simulation Date: ${MONTH_NAMES_EN[summary.currentMonth]} ${summary.currentYear}
+Cumulative Total Revenue: $${formatNumber(summary.totalRevenue)}
+Monthly Revenue: $${formatNumber(summary.monthRevenue)}
+Month-over-Month Change: ${summary.delta.percentage > 0 ? '+' : ''}${summary.delta.percentage.toFixed(1)}%
+Months Simulated: ${summary.monthsSimulated}
+
+This month's cargo performance (sorted by revenue):
+${cargoInfo}
+
+Please provide cargo dispatch recommendations for next month (${nextMonthName}):
+1. 2 cargo types recommended for increasing volume and reasons
+2. 1 cargo type recommended for decreasing volume and reasons
+3. Market trend analysis for next month
+4. Concrete dispatch strategy recommendations (including suggested volume adjustment percentages)
+`;
+    }
   }
 
   _getLocalAdvice(summary) {
-    const { cargoPerformance, nextMonth, nextMonthIndex, delta, monthsSimulated } = summary;
+    const { cargoPerformance, nextMonthIndex, delta, monthsSimulated } = summary;
 
     // Analyze which cargo is performing best/worst
     const sorted = [...cargoPerformance];
@@ -115,7 +142,8 @@ ${cargoInfo}
       const change = ((nextFactor - currentFactor) / currentFactor * 100).toFixed(1);
 
       seasonalInsights.push({
-        name: cargo.name,
+        id: cargo.id,
+        name: i18n.cargoName(cargo.id),
         emoji: cargo.emoji,
         factor: nextFactor,
         change: parseFloat(change),
@@ -129,18 +157,21 @@ ${cargoInfo}
 
     // Build advice
     const recommendations = [];
+    const localizedNextMonth = i18n.lang === 'zh' ? MONTH_NAMES[nextMonthIndex] : MONTH_NAMES_EN[nextMonthIndex];
 
     // Recommendation 1: Increase
     recommendations.push({
       type: 'increase',
-      title: '📈 建议增加运量',
+      title: i18n.t('advisor.rec.increase'),
       items: topSeasonal.length > 0 ? topSeasonal.map(s => ({
+        id: s.id,
         name: `${s.emoji} ${s.name}`,
-        reason: `下月（${nextMonth}）季节性因子将提升 ${s.change > 0 ? '+' : ''}${s.change}%，建议增加运量 15-20%`,
+        reason: i18n.t('advisor.rec.increaseReason', localizedNextMonth, s.change),
         factor: s.factor
       })) : bestPerformers.map(bp => ({
-        name: bp.name,
-        reason: `本月表现优异（趋势 ${bp.trend}），市场需求旺盛，建议维持或增加 10% 运量`,
+        id: bp.id,
+        name: `${bp.emoji || ''} ${i18n.cargoName(bp.id)}`,
+        reason: i18n.t('advisor.rec.maintainReason', bp.trend),
         factor: 1.0
       }))
     });
@@ -149,27 +180,29 @@ ${cargoInfo}
     if (weakSeasonal.length > 0) {
       recommendations.push({
         type: 'decrease',
-        title: '📉 建议减少运量',
+        title: i18n.t('advisor.rec.decrease'),
         items: weakSeasonal.map(s => ({
+          id: s.id,
           name: `${s.emoji} ${s.name}`,
-          reason: `下月季节性因子将下降 ${s.change}%，需求可能走弱，建议减少运量 10-15%`
+          reason: i18n.t('advisor.rec.decreaseSeasonReason', s.change)
         }))
       });
     } else {
       recommendations.push({
         type: 'decrease',
-        title: '📉 建议减少运量',
+        title: i18n.t('advisor.rec.decrease'),
         items: [{
-          name: `${worstPerformer.name}`,
-          reason: `本月收益排名末尾（趋势 ${worstPerformer.trend}），建议适当减少运量，释放运力给高收益货物`
+          id: worstPerformer.id,
+          name: `${worstPerformer.emoji || ''} ${i18n.cargoName(worstPerformer.id)}`,
+          reason: i18n.t('advisor.rec.decreaseWorstReason', worstPerformer.trend)
         }]
       });
     }
 
     // Market trend
-    const overallTrend = delta.percentage > 5 ? '强劲上升' :
-                          delta.percentage > 0 ? '稳步增长' :
-                          delta.percentage > -5 ? '小幅波动' : '明显下滑';
+    const overallTrend = delta.percentage > 5 ? i18n.t('advisor.market.strongUp') :
+                          delta.percentage > 0 ? i18n.t('advisor.market.steadyGrow') :
+                          delta.percentage > -5 ? i18n.t('advisor.market.fluctuate') : i18n.t('advisor.market.decline');
 
     const trendEmoji = delta.percentage > 5 ? '🚀' :
                         delta.percentage > 0 ? '📊' :
@@ -179,8 +212,12 @@ ${cargoInfo}
     const highGrowth = CARGO_TYPES.reduce((best, c) =>
       c.growthRate > best.growthRate ? c : best, CARGO_TYPES[0]);
 
+    const trendDesc = i18n.lang === 'zh' 
+      ? `整体市场${overallTrend}。${monthsSimulated > 3 ? i18n.t('advisor.market.matureOps') : i18n.t('advisor.market.earlyOps')}`
+      : `Overall market is showing ${overallTrend.toLowerCase()}. ${monthsSimulated > 3 ? i18n.t('advisor.market.matureOps') : i18n.t('advisor.market.earlyOps')}`;
+
     return {
-      source: '本地规则引擎',
+      source: i18n.t('advisor.source.local'),
       content: null,
       raw: false,
       structured: {
@@ -188,20 +225,16 @@ ${cargoInfo}
           emoji: trendEmoji,
           trend: overallTrend,
           deltaStr: `${delta.percentage > 0 ? '+' : ''}${delta.percentage.toFixed(1)}%`,
-          description: `整体市场${overallTrend}。${monthsSimulated > 3 ?
-            '随着铁路运营逐步成熟，运输效率持续提升。' :
-            '铁路刚开始运营，市场仍在培育阶段。'}`
+          description: trendDesc
         },
         recommendations,
         strategy: {
-          title: '🎯 综合调度策略',
+          title: i18n.t('advisor.strategy.title'),
           points: [
-            `重点发力 ${highGrowth.emoji} ${highGrowth.name}（月增长率 ${(highGrowth.growthRate * 100).toFixed(1)}%），长期收益潜力最大`,
-            `关注欧洲市场需求变化，出口欧洲占总收益约 30%，是重要利润来源`,
-            delta.percentage > 0 ?
-              '当前势头良好，可适度扩大总运量 5-10%' :
-              '市场出现回调，建议优化货物结构而非盲目扩量',
-            `建议在马克马尔换装站提前布局热门货物，减少换装等待时间`
+            i18n.t('advisor.strategy.focus', highGrowth.emoji, i18n.cargoName(highGrowth.id), (highGrowth.growthRate * 100).toFixed(1)),
+            i18n.t('advisor.strategy.europe'),
+            delta.percentage > 0 ? i18n.t('advisor.strategy.expand') : i18n.t('advisor.strategy.optimize'),
+            i18n.t('advisor.strategy.layout')
           ]
         },
         // Concrete adjustments for simulation
@@ -214,43 +247,24 @@ ${cargoInfo}
   _buildAdjustments(topSeasonal, weakSeasonal, bestPerformers, worstPerformer) {
     const adjustments = {};
 
-    // Map seasonal names back to cargo IDs
-    const nameToId = {};
-    CARGO_TYPES.forEach(c => { nameToId[c.name] = c.id; });
-
     // Increase recommendations: +15-20%
     if (topSeasonal.length > 0) {
       topSeasonal.forEach(s => {
-        const name = s.name.replace(/^[^\s]+\s/, ''); // strip emoji
-        if (nameToId[name]) {
-          adjustments[nameToId[name]] = 1.0 + Math.min(s.change, 20) / 100;
-        }
+        adjustments[s.id] = 1.0 + Math.min(s.change, 20) / 100;
       });
     } else {
       bestPerformers.forEach(bp => {
-        // Try finding by name directly
-        CARGO_TYPES.forEach(c => {
-          if (bp.name.includes(c.name)) {
-            adjustments[c.id] = 1.10;
-          }
-        });
+        adjustments[bp.id] = 1.10;
       });
     }
 
     // Decrease recommendations: -10-15%
     if (weakSeasonal.length > 0) {
       weakSeasonal.forEach(s => {
-        const name = s.name.replace(/^[^\s]+\s/, ''); // strip emoji
-        if (nameToId[name]) {
-          adjustments[nameToId[name]] = 1.0 + Math.max(s.change, -15) / 100;
-        }
+        adjustments[s.id] = 1.0 + Math.max(s.change, -15) / 100;
       });
     } else {
-      CARGO_TYPES.forEach(c => {
-        if (worstPerformer.name.includes(c.name)) {
-          adjustments[c.id] = 0.88;
-        }
-      });
+      adjustments[worstPerformer.id] = 0.88;
     }
 
     return adjustments;
@@ -259,17 +273,13 @@ ${cargoInfo}
   // Parse AI (Groq) raw response to extract volume adjustments
   static parseRawAdviceToAdjustments(rawText) {
     const adjustments = {};
-    const nameToId = {};
-    CARGO_TYPES.forEach(c => {
-      nameToId[c.name] = c.id;
-      nameToId[c.nameEn.toLowerCase()] = c.id;
-    });
 
-    // Try to find percentage patterns like "增加 15%" or "减少 10%"
+    // Try to find percentage patterns like "增加 15%" or "increase 10%"
     for (const cargo of CARGO_TYPES) {
-      // Look for the cargo name followed by increase/decrease percentage
-      const increaseRegex = new RegExp(cargo.name + '[\\s\\S]{0,60}(增加|提升|扩大)[\\s]*(\\d+)[\\s]*[%％]', 'i');
-      const decreaseRegex = new RegExp(cargo.name + '[\\s\\S]{0,60}(减少|降低|缩减)[\\s]*(\\d+)[\\s]*[%％]', 'i');
+      const namesPattern = `(${cargo.name}|${cargo.nameEn})`;
+      
+      const increaseRegex = new RegExp(namesPattern + '[\\s\\S]{0,60}(增加|提升|扩大|increase|raise|boost|up)[\\s]*(\\d+)[\\s]*[%％]', 'i');
+      const decreaseRegex = new RegExp(namesPattern + '[\\s\\S]{0,60}(减少|降低|缩减|decrease|reduce|drop|down)[\\s]*(\\d+)[\\s]*[%％]', 'i');
 
       const incMatch = rawText.match(increaseRegex);
       const decMatch = rawText.match(decreaseRegex);
@@ -287,10 +297,11 @@ ${cargoInfo}
     if (Object.keys(adjustments).length === 0) {
       // Provide gentle adjustments based on keywords
       for (const cargo of CARGO_TYPES) {
-        if (rawText.includes(cargo.name)) {
-          if (rawText.match(new RegExp(cargo.name + '[\\s\\S]{0,30}(增加|提升|扩大|重点)', 'i'))) {
+        const namesPattern = `(${cargo.name}|${cargo.nameEn})`;
+        if (rawText.match(new RegExp(namesPattern, 'i'))) {
+          if (rawText.match(new RegExp(namesPattern + '[\\s\\S]{0,40}(增加|提升|扩大|重点|increase|raise|boost|focus)', 'i'))) {
             adjustments[cargo.id] = 1.12;
-          } else if (rawText.match(new RegExp(cargo.name + '[\\s\\S]{0,30}(减少|降低|缩减|压缩)', 'i'))) {
+          } else if (rawText.match(new RegExp(namesPattern + '[\\s\\S]{0,40}(减少|降低|缩减|compression|decrease|reduce|cut)', 'i'))) {
             adjustments[cargo.id] = 0.88;
           }
         }
@@ -310,7 +321,7 @@ ${cargoInfo}
         .replace(/(\d+\.\s)/g, '<br>$1');
       return `
         <div style="margin-bottom:8px;font-size:0.75rem;color:var(--text-muted)">
-          🤖 来源：${advice.source}
+          🤖 ${i18n.t('ai.title')}: ${advice.source}
         </div>
         <div style="line-height:1.9">${formatted}</div>
       `;
@@ -321,10 +332,10 @@ ${cargoInfo}
 
     let html = `
       <div style="margin-bottom:8px;font-size:0.75rem;color:var(--text-muted)">
-        🧠 来源：${advice.source}（未配置 API Key，使用本地分析引擎）
+        🧠 ${i18n.t('ai.title')}: ${advice.source} (${i18n.t('advisor.source.localNote')})
       </div>
 
-      <h3 style="margin-bottom:12px">${marketTrend.emoji} 市场趋势：${marketTrend.trend} (${marketTrend.deltaStr})</h3>
+      <h3 style="margin-bottom:12px">${marketTrend.emoji} ${i18n.t('advisor.market.trend')}：${marketTrend.trend} (${marketTrend.deltaStr})</h3>
       <p style="margin-bottom:16px;color:var(--text-secondary)">${marketTrend.description}</p>
     `;
 

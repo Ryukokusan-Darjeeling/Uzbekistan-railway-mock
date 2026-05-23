@@ -269,22 +269,25 @@ class RailwayMap {
     const midIdx = Math.floor(coords.length / 2);
     const midCoord = coords[midIdx];
 
+    const localRegionName = i18n.regionName(regionId);
+    const localRegionDesc = i18n.regionDesc(regionId);
+
     const popupContent = `
-      <div class="popup-title">${region.emoji} ${region.name}</div>
+      <div class="popup-title">${region.emoji} ${localRegionName}</div>
       <div class="popup-stat">
-        <span class="label">路段</span>
-        <span class="value">${region.description}</span>
+        <span class="label">${i18n.t('popup.section')}</span>
+        <span class="value">${localRegionDesc}</span>
       </div>
       <div class="popup-stat">
-        <span class="label">距离</span>
+        <span class="label">${i18n.t('popup.distance')}</span>
         <span class="value">${region.distance}</span>
       </div>
       <div class="popup-stat">
-        <span class="label">本月收益</span>
+        <span class="label">${i18n.t('popup.monthRevenue')}</span>
         <span class="value" style="color:#06d6a0">$${formatNumber(data.revenue)}</span>
       </div>
       <div class="popup-stat">
-        <span class="label">收益占比</span>
+        <span class="label">${i18n.t('popup.revenueShare')}</span>
         <span class="value">${(region.revenueShare * 100).toFixed(0)}%</span>
       </div>
     `;

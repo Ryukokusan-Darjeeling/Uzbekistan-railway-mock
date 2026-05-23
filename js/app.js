@@ -15,6 +15,9 @@ class App {
   }
 
   init() {
+    // Initialize i18n configuration first
+    i18n.init();
+
     this.map = new RailwayMap('railway-map');
     this.map.init();
     this.map.onRegionSelect = (regionId) => this._onRegionSelect(regionId);
@@ -25,6 +28,30 @@ class App {
     this.ui = new UIManager(this.sim);
 
     this._bindEvents();
+    
+    // Register language change listener to refresh UI & Charts dynamically
+    i18n.onChange(() => {
+      this._updateAll();
+      this.charts.updateLocale();
+
+      // If we already have local AI advice, regenerate it in the new language
+      if (this.lastAdvice) {
+        const resultEl = document.getElementById('advisorResult');
+        if (resultEl) {
+          if (!this.lastAdvice.raw) {
+            const summary = this.sim.getSimulationSummary();
+            this.lastAdvice = this.advisor._getLocalAdvice(summary);
+          }
+          resultEl.innerHTML = CargoAdvisor.formatAdviceHTML(this.lastAdvice);
+        }
+      }
+
+      // Update adjustments preview in the new language
+      if (this.lastAdjustments) {
+        this.ui.updateAdjustmentsPreview(this.lastAdjustments);
+      }
+    });
+
     this._updateAll();
 
     // Hide loading overlay
@@ -33,7 +60,7 @@ class App {
       if (overlay) overlay.classList.add('hidden');
     }, 1600);
 
-    console.log('🚂 中吉乌铁路经济模拟器已启动');
+    console.log('🚂 中吉乌铁路经济模拟器已启动 / CKU Railway Simulator Started');
   }
 
   _bindEvents() {
@@ -42,7 +69,7 @@ class App {
     document.getElementById('btnAdvance6').addEventListener('click', () => {
       for (let i = 0; i < 6; i++) this.sim.advanceMonth();
       this._updateAll();
-      this.ui.showToast('⏩ 已快进 6 个月', 'info');
+      this.ui.showToast(i18n.t('toast.advance6'), 'info');
     });
 
     document.getElementById('btnReset').addEventListener('click', () => this.resetSimulation());
@@ -51,10 +78,15 @@ class App {
       this.ui.hideRegionPanel();
     });
 
+    // Language Toggle Click Event
+    document.getElementById('langToggle')?.addEventListener('click', () => {
+      i18n.toggle();
+    });
+
     document.getElementById('apiKeyInput')?.addEventListener('change', (e) => {
       this.advisor.setApiKey(e.target.value);
       if (this.advisor.useAPI) {
-        this.ui.showToast('🔑 API Key 已设置，将使用 Groq AI', 'success');
+        this.ui.showToast(i18n.t('toast.apiKeySet'), 'success');
       }
     });
 
@@ -64,7 +96,7 @@ class App {
 
     document.getElementById('btnDownloadChart')?.addEventListener('click', () => {
       this.charts.downloadComparisonChart();
-      this.ui.showToast('⬇️ 对比图已下载', 'success');
+      this.ui.showToast(i18n.t('toast.chartDownloaded'), 'success');
     });
 
     document.getElementById('btnCloseComparison')?.addEventListener('click', () => {
@@ -90,25 +122,25 @@ class App {
     if (enabled) {
       if (this.lastAdjustments && Object.keys(this.lastAdjustments).length > 0) {
         this.sim.setAIAdjustments(this.lastAdjustments);
-        statusText.textContent = '已采纳 AI 建议 ✓';
+        statusText.textContent = i18n.t('ai.status.on');
         statusDot.className = 'status-dot on';
         toggleLabel.classList.add('active');
         if (preview) preview.style.display = 'block';
-        this.ui.showToast('🤖 AI 调控已开启，下月模拟将采纳 AI 建议', 'success');
+        this.ui.showToast(i18n.t('toast.aiOn'), 'success');
       } else {
-        statusText.textContent = '请先获取 AI 建议';
+        statusText.textContent = i18n.t('ai.status.pending');
         statusDot.className = 'status-dot pending';
         toggleLabel.classList.add('active');
-        this.ui.showToast('⚠️ 请先点击「获取 AI 建议」，再开启 AI 调控', 'info');
+        this.ui.showToast(i18n.t('toast.aiNeedAdvice'), 'info');
       }
       if (exportBtn) exportBtn.disabled = false;
     } else {
       this.sim.setAIAdjustments({});
-      statusText.textContent = '未采纳 AI 建议';
+      statusText.textContent = i18n.t('ai.status.off');
       statusDot.className = 'status-dot off';
       toggleLabel.classList.remove('active');
       if (preview) preview.style.display = 'none';
-      this.ui.showToast('AI 调控已关闭', 'info');
+      this.ui.showToast(i18n.t('toast.aiOff'), 'info');
     }
   }
 
@@ -116,8 +148,13 @@ class App {
     this.sim.advanceMonth();
     this._updateAll();
     const data = this.sim.getLatestMonthData();
-    let toastMsg = `📅 已推进到 ${data.monthLabelCN}`;
-    if (data.aiApplied) toastMsg += ' (AI 调控生效中)';
+    
+    // Localize the advance month message
+    const formattedDate = i18n.formatDate(data.year, data.month);
+    let toastMsg = i18n.t('toast.advance', formattedDate);
+    if (data.aiApplied) {
+      toastMsg += i18n.t('toast.advance.ai');
+    }
     this.ui.showToast(toastMsg, 'success');
   }
 
@@ -131,7 +168,7 @@ class App {
 
     const advisorResult = document.getElementById('advisorResult');
     if (advisorResult) {
-      advisorResult.innerHTML = '<span class="text-muted">点击「获取 AI 建议」按钮获取货物调度建议...</span>';
+      advisorResult.innerHTML = `<span class="text-muted">${i18n.t('ai.result.placeholder')}</span>`;
     }
 
     this.lastAdvice = null;
@@ -145,7 +182,7 @@ class App {
     const exportBtn = document.getElementById('btnExportComparison');
     if (exportBtn) exportBtn.disabled = true;
 
-    this.ui.showToast('🔄 模拟器已重置到 2026年1月', 'info');
+    this.ui.showToast(i18n.t('toast.reset'), 'info');
   }
 
   async getAdvice() {
@@ -155,7 +192,7 @@ class App {
     resultEl.innerHTML = `
       <div class="advisor-result loading" style="display:flex;align-items:center;gap:12px">
         <div class="typing-dots"><span></span><span></span><span></span></div>
-        <span>正在分析数据并生成调度建议...</span>
+        <span>${i18n.t('ai.loading')}</span>
       </div>
     `;
 
@@ -179,7 +216,7 @@ class App {
         this.sim.setAIAdjustments(this.lastAdjustments);
         const statusText = document.getElementById('aiStatusText');
         const statusDot = document.getElementById('aiStatusBadge')?.querySelector('.status-dot');
-        if (statusText) statusText.textContent = '已采纳 AI 建议 ✓';
+        if (statusText) statusText.textContent = i18n.t('ai.status.on');
         if (statusDot) statusDot.className = 'status-dot on';
         const preview = document.getElementById('aiAdjustmentsPreview');
         if (preview) preview.style.display = 'block';
@@ -187,9 +224,9 @@ class App {
 
       const exportBtn = document.getElementById('btnExportComparison');
       if (exportBtn) exportBtn.disabled = false;
-      this.ui.showToast('✅ AI 建议已生成，可开启 AI 调控开关采纳建议', 'success');
+      this.ui.showToast(i18n.t('toast.adviceGenerated'), 'success');
     } else {
-      resultEl.innerHTML = '<span class="text-red">⚠️ 获取建议失败，请检查网络或 API Key</span>';
+      resultEl.innerHTML = `<span class="text-red">⚠️ ${i18n.t('ai.error')}</span>`;
     }
   }
 
