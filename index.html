@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="中吉乌铁路经济收益模拟器 - 模拟中国-吉尔吉斯斯坦-乌兹别克斯坦铁路的货物运输经济收益">
+  <meta name="author" content="Darjeeling">
   <title>中吉乌铁路经济模拟器 | CKU Railway Simulator</title>
 
   <!-- Google Fonts -->
@@ -26,7 +27,7 @@
   <!-- Loading Overlay -->
   <div id="loadingOverlay" class="loading-overlay">
     <div class="loading-train">🚂</div>
-    <div class="loading-text">正在初始化铁路模拟系统...</div>
+    <div class="loading-text" data-i18n="loading.text">正在初始化铁路模拟系统...</div>
     <div class="loading-bar">
       <div class="loading-bar-fill"></div>
     </div>
@@ -39,8 +40,8 @@
       <div class="header-left">
         <div class="logo-icon">🚂</div>
         <div class="header-title">
-          <h1>中吉乌铁路经济模拟器</h1>
-          <p>China-Kyrgyzstan-Uzbekistan Railway Simulator</p>
+          <h1 data-i18n="header.title">中吉乌铁路经济模拟器</h1>
+          <p data-i18n="header.subtitle">China-Kyrgyzstan-Uzbekistan Railway Simulator</p>
         </div>
       </div>
 
@@ -53,13 +54,18 @@
       </div>
 
       <div class="header-controls">
-        <button class="btn btn-primary" id="btnAdvance">
+        <!-- Language Toggle -->
+        <button class="btn btn-lang" id="langToggle" title="Switch Language / 切换语言">
+          <span class="lang-btn-icon">🌐</span>
+          <span class="lang-btn-text">EN</span>
+        </button>
+        <button class="btn btn-primary" id="btnAdvance" data-i18n="header.btnAdvance">
           ▶ 推进下月
         </button>
-        <button class="btn btn-ghost" id="btnAdvance6">
+        <button class="btn btn-ghost" id="btnAdvance6" data-i18n="header.btnAdvance6">
           ⏩ 快进6月
         </button>
-        <button class="btn btn-danger" id="btnReset">
+        <button class="btn btn-danger" id="btnReset" data-i18n="header.btnReset">
           ↺ 重置
         </button>
       </div>
@@ -73,9 +79,9 @@
         <div class="card-header">
           <div class="card-title">
             <span class="icon">🗺️</span>
-            铁路路线图 — 点击路线段查看区域收益
+            <span data-i18n="map.title">铁路路线图 — 点击路线段查看区域收益</span>
           </div>
-          <button class="btn btn-ghost" id="btnResetMap" style="padding:6px 14px;font-size:0.78rem">
+          <button class="btn btn-ghost" id="btnResetMap" style="padding:6px 14px;font-size:0.78rem" data-i18n="map.resetView">
             🔄 重置视图
           </button>
         </div>
@@ -83,22 +89,22 @@
 
         <!-- Map Legend -->
         <div class="map-legend">
-          <h4>路线图例</h4>
+          <h4 data-i18n="map.legend.title">路线图例</h4>
           <div class="legend-item">
             <span class="legend-color" style="background:#ef4444"></span>
-            🇨🇳 中国段 (213km)
+            <span data-i18n="map.legend.china">🇨🇳 中国段 (213km)</span>
           </div>
           <div class="legend-item">
             <span class="legend-color" style="background:#f59e0b"></span>
-            🇰🇬 吉尔吉斯斯坦段 (300km)
+            <span data-i18n="map.legend.kyrgyzstan">🇰🇬 吉尔吉斯斯坦段 (300km)</span>
           </div>
           <div class="legend-item">
             <span class="legend-color" style="background:#06d6a0"></span>
-            🇺🇿 乌兹别克斯坦段 (60km)
+            <span data-i18n="map.legend.uzbekistan">🇺🇿 乌兹别克斯坦段 (60km)</span>
           </div>
           <div class="legend-item">
             <span class="legend-color" style="background:#667eea"></span>
-            🇪🇺 欧洲连线 (虚线)
+            <span data-i18n="map.legend.europe">🇪🇺 欧洲连线 (虚线)</span>
           </div>
         </div>
       </div>
@@ -106,30 +112,30 @@
       <!-- Stats Panel -->
       <div class="stats-panel">
         <div class="glass-card stat-card total animate-in">
-          <div class="stat-label">📊 累计总收益</div>
+          <div class="stat-label" data-i18n="stat.totalRevenue.label">📊 累计总收益</div>
           <div class="stat-value" id="totalRevenue">$0</div>
-          <div class="stat-sub">自 2026年1月 起累计</div>
+          <div class="stat-sub" data-i18n="stat.totalRevenue.sub">自 2026年1月 起累计</div>
         </div>
 
         <div class="glass-card stat-card monthly animate-in">
-          <div class="stat-label">💰 本月收益</div>
+          <div class="stat-label" data-i18n="stat.monthlyRevenue.label">💰 本月收益</div>
           <div class="stat-value" id="monthlyRevenue">$0</div>
-          <div class="stat-sub">当月运输总收入</div>
+          <div class="stat-sub" data-i18n="stat.monthlyRevenue.sub">当月运输总收入</div>
         </div>
 
         <div class="glass-card stat-card delta animate-in">
-          <div class="stat-label">📈 环比变化</div>
+          <div class="stat-label" data-i18n="stat.delta.label">📈 环比变化</div>
           <div class="stat-value" id="revenueDelta">+0.0%</div>
           <div class="stat-sub">
             <span id="deltaIndicator" class="delta-indicator positive">↑ +0.0%</span>
-            &nbsp;对比上月
+            &nbsp;<span data-i18n="stat.delta.sub.suffix">对比上月</span>
           </div>
         </div>
 
         <div class="glass-card stat-card volume animate-in">
-          <div class="stat-label">📦 本月运量</div>
+          <div class="stat-label" data-i18n="stat.volume.label">📦 本月运量</div>
           <div class="stat-value" id="totalVolume">0吨</div>
-          <div class="stat-sub">所有货物总运输量</div>
+          <div class="stat-sub" data-i18n="stat.volume.sub">所有货物总运输量</div>
         </div>
       </div>
     </div>
@@ -139,14 +145,14 @@
       <div class="card-header">
         <div class="card-title">
           <span class="icon">📍</span>
-          <span id="regionTitle">区域详情</span>
+          <span id="regionTitle" data-i18n="region.title">区域详情</span>
         </div>
         <div class="flex items-center gap-1">
-          <span class="text-sm text-muted">距离：</span>
+          <span class="text-sm text-muted" data-i18n="region.distance">距离：</span>
           <span class="text-sm" id="regionDistance">-</span>
-          <span class="text-sm text-muted" style="margin-left:16px">收益：</span>
+          <span class="text-sm text-muted" style="margin-left:16px" data-i18n="region.revenue">收益：</span>
           <span class="text-sm text-green" style="font-weight:700" id="regionRevenue">-</span>
-          <span class="text-sm text-muted" style="margin-left:16px">占比：</span>
+          <span class="text-sm text-muted" style="margin-left:16px" data-i18n="region.share">占比：</span>
           <span class="text-sm" id="regionShare">-</span>
         </div>
       </div>
@@ -161,7 +167,7 @@
         <div class="card-header">
           <div class="card-title">
             <span class="icon">📈</span>
-            月度收益趋势 & 环比变化
+            <span data-i18n="chart.trend.title">月度收益趋势 & 环比变化</span>
           </div>
         </div>
         <div class="chart-container">
@@ -173,7 +179,7 @@
         <div class="card-header">
           <div class="card-title">
             <span class="icon">🍩</span>
-            货物收益构成
+            <span data-i18n="chart.cargo.title">货物收益构成</span>
           </div>
         </div>
         <div class="chart-container">
@@ -187,18 +193,18 @@
       <div class="card-header">
         <div class="card-title">
           <span class="icon">📋</span>
-          货物运输明细
+          <span data-i18n="cargo.table.title">货物运输明细</span>
         </div>
       </div>
       <div class="cargo-table-wrapper">
         <table class="cargo-table">
           <thead>
             <tr>
-              <th>货物类型</th>
-              <th>运量</th>
-              <th>单价</th>
-              <th>收益</th>
-              <th>环比</th>
+              <th data-i18n="cargo.table.type">货物类型</th>
+              <th data-i18n="cargo.table.volume">运量</th>
+              <th data-i18n="cargo.table.price">单价</th>
+              <th data-i18n="cargo.table.revenue">收益</th>
+              <th data-i18n="cargo.table.trend">环比</th>
             </tr>
           </thead>
           <tbody id="cargoTableBody">
@@ -213,20 +219,20 @@
       <div class="card-header">
         <div class="card-title">
           <span class="icon">🤖</span>
-          AI 货物调度建议
+          <span data-i18n="ai.title">AI 货物调度建议</span>
         </div>
         <div class="ai-toggle-group">
           <label class="ai-toggle" for="aiToggle" id="aiToggleLabel">
             <input type="checkbox" id="aiToggle">
             <span class="toggle-slider"></span>
             <span class="toggle-text">
-              <span class="toggle-off">AI 调控：关闭</span>
-              <span class="toggle-on">AI 调控：开启</span>
+              <span class="toggle-off" data-i18n="ai.toggle.off">AI 调控：关闭</span>
+              <span class="toggle-on" data-i18n="ai.toggle.on">AI 调控：开启</span>
             </span>
           </label>
           <div class="ai-status-badge" id="aiStatusBadge">
             <span class="status-dot off"></span>
-            <span id="aiStatusText">未采纳 AI 建议</span>
+            <span id="aiStatusText" data-i18n="ai.status.off">未采纳 AI 建议</span>
           </div>
         </div>
       </div>
@@ -236,25 +242,26 @@
           type="password"
           class="api-key-input"
           id="apiKeyInput"
+          data-i18n-placeholder="ai.apiKey.placeholder"
           placeholder="可选：输入 Groq API Key 获取 AI 建议（免费注册 groq.com）"
         >
-        <button class="btn btn-success" id="btnGetAdvice">
+        <button class="btn btn-success" id="btnGetAdvice" data-i18n="ai.btnGetAdvice">
           🧠 获取 AI 建议
         </button>
-        <button class="btn btn-export" id="btnExportComparison" disabled>
+        <button class="btn btn-export" id="btnExportComparison" disabled data-i18n="ai.btnExport">
           📊 导出对比图
         </button>
       </div>
 
       <div class="advisor-result" id="advisorResult">
-        <span class="text-muted">点击「获取 AI 建议」按钮获取货物调度建议。未设置 API Key 时将使用本地分析引擎。</span>
+        <span class="text-muted" data-i18n="ai.result.placeholder">点击「获取 AI 建议」按钮获取货物调度建议。未设置 API Key 时将使用本地分析引擎。</span>
       </div>
 
       <!-- AI Adjustments Preview -->
       <div class="ai-adjustments-preview" id="aiAdjustmentsPreview" style="display:none">
         <div class="adjustments-header">
           <span class="icon">⚙️</span>
-          <span>当前 AI 调控参数（将应用于下月模拟）</span>
+          <span data-i18n="ai.adjustments.header">当前 AI 调控参数（将应用于下月模拟）</span>
         </div>
         <div class="adjustments-grid" id="adjustmentsGrid">
           <!-- Dynamically populated -->
@@ -267,14 +274,14 @@
       <div class="card-header">
         <div class="card-title">
           <span class="icon">🧬</span>
-          模拟算法说明 — Simulation Algorithm
+          <span data-i18n="algo.title">模拟算法说明 — Simulation Algorithm</span>
         </div>
       </div>
       <div class="algorithm-content">
         <!-- Baseline Algorithm -->
         <div class="algo-block baseline">
-          <h3><span class="algo-icon">📐</span> 基线调控算法（无 AI 介入）</h3>
-          <p>
+          <h3><span class="algo-icon">📐</span> <span data-i18n="algo.baseline.title">基线调控算法（无 AI 介入）</span></h3>
+          <p data-i18n="algo.baseline.desc" data-i18n-html>
             基线模拟采用<strong>蒙特卡洛随机模拟（Monte Carlo Simulation）</strong>结合
             <strong>乘法季节分解模型（Multiplicative Seasonal Decomposition）</strong>。
           </p>
@@ -284,18 +291,18 @@
             Revenue &nbsp;= Σ Volume_i × Price_i
           </div>
           <ul class="algo-list">
-            <li><span class="bullet">▸</span> <span><span class="algo-tag deterministic">确定性</span><strong>季节因子 S[month]</strong>：每种货物拥有 12 个月的季节系数（0.7~1.4），反映真实市场的季节性波动</span></li>
-            <li><span class="bullet">▸</span> <span><span class="algo-tag deterministic">确定性</span><strong>指数增长趋势</strong>：复合月增长率 g = 1%~3.5%，模拟铁路通车后货运量的自然增长</span></li>
-            <li><span class="bullet">▸</span> <span><span class="algo-tag stochastic">随机性</span><strong>均匀分布随机量</strong> U(min, max)：每月运量在 [minVolume, maxVolume] 区间内均匀随机采样</span></li>
-            <li><span class="bullet">▸</span> <span><span class="algo-tag stochastic">随机性</span><strong>价格波动 ±15%</strong>：每种货物的单价基于基准价上下浮动 15%，模拟市场不确定性</span></li>
-            <li><span class="bullet">▸</span> <span><span class="algo-tag deterministic">确定性</span><strong>固定比例区域分配</strong>：中国段 30%、吉尔吉斯斯坦段 25%、乌兹别克斯坦段 15%、欧洲连线 30%</span></li>
+            <li><span class="bullet">▸</span> <span data-i18n="algo.baseline.seasonFactor" data-i18n-html><span class="algo-tag deterministic">确定性</span><strong>季节因子 S[month]</strong>：每种货物拥有 12 个月的季节系数（0.7~1.4），反映真实市场的季节性波动</span></li>
+            <li><span class="bullet">▸</span> <span data-i18n="algo.baseline.growth" data-i18n-html><span class="algo-tag deterministic">确定性</span><strong>指数增长趋势</strong>：复合月增长率 g = 1%~3.5%，模拟铁路通车后货运量的自然增长</span></li>
+            <li><span class="bullet">▸</span> <span data-i18n="algo.baseline.random" data-i18n-html><span class="algo-tag stochastic">随机性</span><strong>均匀分布随机量</strong> U(min, max)：每月运量在 [minVolume, maxVolume] 区间内均匀随机采样</span></li>
+            <li><span class="bullet">▸</span> <span data-i18n="algo.baseline.price" data-i18n-html><span class="algo-tag stochastic">随机性</span><strong>价格波动 ±15%</strong>：每种货物的单价基于基准价上下浮动 15%，模拟市场不确定性</span></li>
+            <li><span class="bullet">▸</span> <span data-i18n="algo.baseline.region" data-i18n-html><span class="algo-tag deterministic">确定性</span><strong>固定比例区域分配</strong>：中国段 30%、吉尔吉斯斯坦段 25%、乌兹别克斯坦段 15%、欧洲连线 30%</span></li>
           </ul>
         </div>
 
         <!-- AI Algorithm -->
         <div class="algo-block ai-algo">
-          <h3><span class="algo-icon">🤖</span> AI 调控算法（开启 AI 后）</h3>
-          <p>
+          <h3><span class="algo-icon">🤖</span> <span data-i18n="algo.ai.title">AI 调控算法（开启 AI 后）</span></h3>
+          <p data-i18n="algo.ai.desc" data-i18n-html>
             AI 调控模式下，系统使用<strong>规则基专家系统（Rule-Based Expert System）</strong>
             或外部 <strong>LLM（Groq / Llama 3.1）</strong> 生成调度建议。
           </p>
@@ -304,21 +311,18 @@
             M_i ∈ [0.75, 1.30] &nbsp;（AI 建议的货物运量乘数）
           </div>
           <ul class="algo-list">
-            <li><span class="bullet">▸</span> <span><span class="algo-tag ai">本地引擎</span><strong>季节趋势分析</strong>：对比相邻月份的季节因子变化，识别上升/下降趋势</span></li>
-            <li><span class="bullet">▸</span> <span><span class="algo-tag ai">本地引擎</span><strong>绩效排序</strong>：按当月收益降序排列，推荐增加 Top 2、减少 Bottom 1 的运量</span></li>
-            <li><span class="bullet">▸</span> <span><span class="algo-tag ai">本地引擎</span><strong>启发式调整</strong>：季节因子上升 → 增量 +15~20%；下降 → 减量 -10~15%</span></li>
-            <li><span class="bullet">▸</span> <span><span class="algo-tag ai">LLM 模式</span><strong>自然语言解析</strong>：解析 AI 回复中的百分比关键词，提取运量调整乘数（上限 ±30%）</span></li>
-            <li><span class="bullet">▸</span> <span><span class="algo-tag deterministic">对比基准</span><strong>基线对照</strong>：AI 调控月份同时记录基线收益（未调整的运量 × 同一价格），用于效果对比</span></li>
+            <li><span class="bullet">▸</span> <span data-i18n="algo.ai.seasonal" data-i18n-html><span class="algo-tag ai">本地引擎</span><strong>季节趋势分析</strong>：对比相邻月份的季节因子变化，识别上升/下降趋势</span></li>
+            <li><span class="bullet">▸</span> <span data-i18n="algo.ai.ranking" data-i18n-html><span class="algo-tag ai">本地引擎</span><strong>绩效排序</strong>：按当月收益降序排列，推荐增加 Top 2、减少 Bottom 1 的运量</span></li>
+            <li><span class="bullet">▸</span> <span data-i18n="algo.ai.heuristic" data-i18n-html><span class="algo-tag ai">本地引擎</span><strong>启发式调整</strong>：季节因子上升 → 增量 +15~20%；下降 → 减量 -10~15%</span></li>
+            <li><span class="bullet">▸</span> <span data-i18n="algo.ai.llm" data-i18n-html><span class="algo-tag ai">LLM 模式</span><strong>自然语言解析</strong>：解析 AI 回复中的百分比关键词，提取运量调整乘数（上限 ±30%）</span></li>
+            <li><span class="bullet">▸</span> <span data-i18n="algo.ai.baseline" data-i18n-html><span class="algo-tag deterministic">对比基准</span><strong>基线对照</strong>：AI 调控月份同时记录基线收益（未调整的运量 × 同一价格），用于效果对比</span></li>
           </ul>
         </div>
 
         <hr class="algo-divider">
 
         <div class="algo-summary">
-          <strong>💡 核心区别：</strong>
-          基线模拟完全依赖<strong>随机采样 + 固定季节因子</strong>的被动调控；
-          AI 模式则主动分析市场数据，通过<strong>调整运量乘数 M</strong> 来优化货物配比，
-          最终对比两种策略下的收益差异。两种模式共享相同的价格波动和增长模型，仅在运量决策上存在差异。
+          <strong>💡 <span data-i18n="algo.summary" data-i18n-html>基线模拟完全依赖<strong>随机采样 + 固定季节因子</strong>的被动调控；AI 模式则主动分析市场数据，通过<strong>调整运量乘数 M</strong> 来优化货物配比，最终对比两种策略下的收益差异。两种模式共享相同的价格波动和增长模型，仅在运量决策上存在差异。</span></strong>
         </div>
       </div>
     </div>
@@ -328,13 +332,13 @@
       <div class="card-header">
         <div class="card-title">
           <span class="icon">📊</span>
-          AI 建议采纳 vs 未采纳 — 销售额对比
+          <span data-i18n="comparison.title">AI 建议采纳 vs 未采纳 — 销售额对比</span>
         </div>
         <div class="comparison-actions">
-          <button class="btn btn-ghost" id="btnDownloadChart" style="padding:6px 14px;font-size:0.78rem">
+          <button class="btn btn-ghost" id="btnDownloadChart" style="padding:6px 14px;font-size:0.78rem" data-i18n="comparison.download">
             ⬇️ 下载图片
           </button>
-          <button class="btn btn-ghost" id="btnCloseComparison" style="padding:6px 14px;font-size:0.78rem">
+          <button class="btn btn-ghost" id="btnCloseComparison" style="padding:6px 14px;font-size:0.78rem" data-i18n="comparison.close">
             ✕ 关闭
           </button>
         </div>
@@ -349,13 +353,24 @@
 
     <!-- ===== FOOTER ===== -->
     <footer class="footer">
-      <p>🚂 中吉乌铁路经济模拟器 v1.0 | 数据基于中欧班列统计外推模拟 | 仅供参考</p>
-      <p style="margin-top:4px">铁路预计 2028-2030 年完工通车 | 本项目为模拟/假设场景</p>
+      <p data-i18n="footer.line1">🚂 中吉乌铁路经济模拟器 v1.0 | 数据基于中欧班列统计外推模拟 | 仅供参考</p>
+      <p style="margin-top:4px" data-i18n="footer.line2">铁路预计 2028-2030 年完工通车 | 本项目为模拟/假设场景</p>
+      <div class="footer-author">
+        <span>Made by <strong>Darjeeling</strong></span>
+        <span class="footer-divider">|</span>
+        <a href="https://github.com/Ryukokusan-Darjeeling/Uzbekistan-railway-mock" target="_blank" rel="noopener noreferrer" class="footer-github-link" id="authorGithub">
+          <svg class="github-icon" viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+          <span>GitHub</span>
+        </a>
+      </div>
     </footer>
 
   </div>
 
-  <!-- App Scripts (order matters) -->
+  <!-- App Scripts (order matters: i18n must load before simulation) -->
+  <script src="js/i18n.js"></script>
   <script src="js/simulation.js"></script>
   <script src="js/map.js"></script>
   <script src="js/charts.js"></script>

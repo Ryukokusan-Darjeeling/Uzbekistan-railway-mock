@@ -348,6 +348,8 @@ class SimulationEngine {
 
     return {
       currentDate: this.getCurrentDateStr(),
+      currentYear: this.currentYear,
+      currentMonth: this.currentMonth,
       totalRevenue: this.totalRevenue,
       monthRevenue: latest.totalRevenue,
       delta,

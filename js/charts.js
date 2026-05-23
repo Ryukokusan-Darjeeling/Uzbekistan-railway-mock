@@ -31,7 +31,7 @@ class ChartManager {
         labels: [],
         datasets: [
           {
-            label: '月度收益 ($)',
+            label: i18n.t('chart.trend.revenue'),
             data: [],
             borderColor: '#667eea',
             backgroundColor: 'rgba(102, 126, 234, 0.1)',
@@ -46,7 +46,7 @@ class ChartManager {
             tension: 0.4
           },
           {
-            label: '环比变化 (%)',
+            label: i18n.t('chart.trend.delta'),
             data: [],
             borderColor: '#06d6a0',
             backgroundColor: 'rgba(6, 214, 160, 0.05)',
@@ -89,9 +89,9 @@ class ChartManager {
             callbacks: {
               label: function(context) {
                 if (context.datasetIndex === 0) {
-                  return `收益: $${formatNumber(context.raw)}`;
+                  return `${i18n.t('chart.tooltip.revenue')}: $${formatNumber(context.raw)}`;
                 } else {
-                  return `环比: ${context.raw > 0 ? '+' : ''}${context.raw.toFixed(1)}%`;
+                  return `${i18n.t('chart.tooltip.delta')}: ${context.raw > 0 ? '+' : ''}${context.raw.toFixed(1)}%`;
                 }
               }
             }
@@ -130,7 +130,7 @@ class ChartManager {
     this.cargoChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: CARGO_TYPES.map(c => c.name),
+        labels: CARGO_TYPES.map(c => i18n.cargoName(c.id)),
         datasets: [{
           data: [0, 0, 0, 0, 0, 0],
           backgroundColor: CARGO_TYPES.map(c => c.color + '99'),
@@ -218,7 +218,7 @@ class ChartManager {
         labels: [],
         datasets: [
           {
-            label: '实际收益（采纳 AI 建议）',
+            label: i18n.t('comparison.actual'),
             data: [],
             borderColor: '#06d6a0',
             backgroundColor: 'rgba(6, 214, 160, 0.12)',
@@ -233,7 +233,7 @@ class ChartManager {
             tension: 0.4
           },
           {
-            label: '基线收益（未采纳 AI 建议）',
+            label: i18n.t('comparison.baseline'),
             data: [],
             borderColor: '#667eea',
             backgroundColor: 'rgba(102, 126, 234, 0.08)',
@@ -249,7 +249,7 @@ class ChartManager {
             borderDash: [6, 4]
           },
           {
-            label: '差异金额 ($)',
+            label: i18n.t('comparison.diff'),
             data: [],
             borderColor: '#f59e0b',
             backgroundColor: 'rgba(245, 158, 11, 0.05)',
@@ -296,7 +296,7 @@ class ChartManager {
                   return `${context.dataset.label}: $${formatNumber(context.raw)}`;
                 } else {
                   const sign = context.raw >= 0 ? '+' : '';
-                  return `差异: ${sign}$${formatNumber(context.raw)}`;
+                  return `${i18n.t('comparison.tooltip.diff')}: ${sign}$${formatNumber(context.raw)}`;
                 }
               },
               afterBody: function(tooltipItems) {
@@ -305,7 +305,7 @@ class ChartManager {
                   const baseline = tooltipItems[1].raw;
                   if (baseline > 0) {
                     const pct = ((actual - baseline) / baseline * 100).toFixed(1);
-                    return `\n变化幅度: ${pct > 0 ? '+' : ''}${pct}%`;
+                    return `\n${i18n.t('comparison.tooltip.change')}: ${pct > 0 ? '+' : ''}${pct}%`;
                   }
                 }
                 return '';
@@ -314,7 +314,7 @@ class ChartManager {
           },
           title: {
             display: true,
-            text: 'AI 建议采纳 vs 未采纳 — 货物销售额对比',
+            text: i18n.t('comparison.chart.title'),
             color: '#f0f4ff',
             font: { size: 15, weight: 700 },
             padding: { bottom: 20 }
@@ -334,7 +334,7 @@ class ChartManager {
             },
             title: {
               display: true,
-              text: '销售额 ($)',
+              text: i18n.t('comparison.yAxis'),
               color: '#94a3b8',
               font: { size: 11 }
             }
@@ -348,7 +348,7 @@ class ChartManager {
             },
             title: {
               display: true,
-              text: '差异金额',
+              text: i18n.t('comparison.yAxis2'),
               color: '#94a3b8',
               font: { size: 11 }
             }
@@ -384,6 +384,64 @@ class ChartManager {
     this.comparisonChart.update('active');
   }
 
+  // Update locale translations dynamically without rebuilding the charts
+  updateLocale() {
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
+    Chart.defaults.font.family = "'Inter', sans-serif";
+
+    if (this.trendChart) {
+      this.trendChart.data.datasets[0].label = i18n.t('chart.trend.revenue');
+      this.trendChart.data.datasets[1].label = i18n.t('chart.trend.delta');
+      
+      this.trendChart.options.plugins.tooltip.callbacks.label = function(context) {
+        if (context.datasetIndex === 0) {
+          return `${i18n.t('chart.tooltip.revenue')}: $${formatNumber(context.raw)}`;
+        } else {
+          return `${i18n.t('chart.tooltip.delta')}: ${context.raw > 0 ? '+' : ''}${context.raw.toFixed(1)}%`;
+        }
+      };
+      this.trendChart.update('active');
+    }
+
+    if (this.cargoChart) {
+      this.cargoChart.data.labels = CARGO_TYPES.map(c => i18n.cargoName(c.id));
+      this.cargoChart.update('active');
+    }
+
+    if (this.comparisonChart) {
+      this.comparisonChart.data.datasets[0].label = i18n.t('comparison.actual');
+      this.comparisonChart.data.datasets[1].label = i18n.t('comparison.baseline');
+      this.comparisonChart.data.datasets[2].label = i18n.t('comparison.diff');
+
+      this.comparisonChart.options.plugins.title.text = i18n.t('comparison.chart.title');
+      this.comparisonChart.options.scales.y.title.text = i18n.t('comparison.yAxis');
+      this.comparisonChart.options.scales.y1.title.text = i18n.t('comparison.yAxis2');
+
+      this.comparisonChart.options.plugins.tooltip.callbacks.label = function(context) {
+        if (context.datasetIndex <= 1) {
+          return `${context.dataset.label}: $${formatNumber(context.raw)}`;
+        } else {
+          const sign = context.raw >= 0 ? '+' : '';
+          return `${i18n.t('comparison.tooltip.diff')}: ${sign}$${formatNumber(context.raw)}`;
+        }
+      };
+
+      this.comparisonChart.options.plugins.tooltip.callbacks.afterBody = function(tooltipItems) {
+        if (tooltipItems.length >= 2) {
+          const actual = tooltipItems[0].raw;
+          const baseline = tooltipItems[1].raw;
+          if (baseline > 0) {
+            const pct = ((actual - baseline) / baseline * 100).toFixed(1);
+            return `\n${i18n.t('comparison.tooltip.change')}: ${pct > 0 ? '+' : ''}${pct}%`;
+          }
+        }
+        return '';
+      };
+      this.comparisonChart.update('active');
+    }
+  }
+
   // Download comparison chart as PNG
   downloadComparisonChart() {
     if (!this.comparisonChart) return;
@@ -413,7 +471,7 @@ class ChartManager {
     ctx.font = '12px Inter, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(
-      `🚂 中吉乌铁路经济模拟器 — AI 销售额对比 | 导出时间: ${new Date().toLocaleString('zh-CN')}`,
+      i18n.t('export.footer', new Date().toLocaleString(i18n.lang === 'zh' ? 'zh-CN' : 'en-US')),
       exportCanvas.width / 2,
       exportCanvas.height - 20
     );
