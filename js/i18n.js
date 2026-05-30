@@ -24,7 +24,7 @@ const I18N = {
     'map.legend.china': '🇨🇳 中国段 (213km)',
     'map.legend.kyrgyzstan': '🇰🇬 吉尔吉斯斯坦段 (300km)',
     'map.legend.uzbekistan': '🇺🇿 乌兹别克斯坦段 (60km)',
-    'map.legend.europe': '🇪🇺 欧洲连线 (虚线)',
+    'map.legend.europe': '🇪🇺 欧洲连线',
 
     // Stat Cards
     'stat.totalRevenue.label': '📊 累计总收益',
@@ -212,7 +212,7 @@ const I18N = {
     'map.legend.china': '🇨🇳 China Section (213km)',
     'map.legend.kyrgyzstan': '🇰🇬 Kyrgyzstan Section (300km)',
     'map.legend.uzbekistan': '🇺🇿 Uzbekistan Section (60km)',
-    'map.legend.europe': '🇪🇺 Europe Connection (dashed)',
+    'map.legend.europe': '🇪🇺 Europe Connection',
 
     // Stat Cards
     'stat.totalRevenue.label': '📊 Total Revenue',
