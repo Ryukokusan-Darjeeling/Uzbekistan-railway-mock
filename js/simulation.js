@@ -280,7 +280,9 @@ class SimulationEngine {
       label: record.monthLabelCN,
       actualRevenue: record.totalRevenue,
       baselineRevenue: record.aiApplied ? baselineRevenue : record.totalRevenue,
-      aiApplied: record.aiApplied
+      aiApplied: record.aiApplied,
+      // 快照当月实际生效的 AI 调整乘数，供智能体决策记忆学习
+      adjustments: record.aiApplied ? { ...this.aiAdjustments } : null
     });
 
     return record;

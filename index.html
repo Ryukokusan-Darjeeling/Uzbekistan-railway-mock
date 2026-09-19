@@ -243,7 +243,7 @@
           class="api-key-input"
           id="apiKeyInput"
           data-i18n-placeholder="ai.apiKey.placeholder"
-          placeholder="可选：输入 Groq API Key 获取 AI 建议（免费注册 groq.com）"
+          placeholder="可选：输入 DeepSeek API Key 获取 AI 建议（platform.deepseek.com 注册）"
         >
         <button class="btn btn-success" id="btnGetAdvice" data-i18n="ai.btnGetAdvice">
           🧠 获取 AI 建议
@@ -304,7 +304,7 @@
           <h3><span class="algo-icon">🤖</span> <span data-i18n="algo.ai.title">AI 调控算法（开启 AI 后）</span></h3>
           <p data-i18n="algo.ai.desc" data-i18n-html>
             AI 调控模式下，系统使用<strong>规则基专家系统（Rule-Based Expert System）</strong>
-            或外部 <strong>LLM（Groq / Llama 3.1）</strong> 生成调度建议。
+            或外部 <strong>LLM 智能体（DeepSeek）</strong> 生成调度建议。
           </p>
           <div class="algo-formula">
             Volume_AI(t) = Volume_baseline(t) × M_i<br>
@@ -374,6 +374,7 @@
   <script src="js/simulation.js"></script>
   <script src="js/map.js"></script>
   <script src="js/charts.js"></script>
+  <script src="js/config.local.js"></script>
   <script src="js/advisor.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/app.js"></script>

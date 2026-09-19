@@ -1,6 +1,6 @@
 # CKU Railway Economic Simulator (Uzbekistan-railway-mock)
 
-A premium, interactive, and intelligent web-based economic simulation dashboard for the **China-Kyrgyzstan-Uzbekistan (CKU) Railway**. This simulator models dynamic cargo flows, seasonal market fluctuations, regional revenue sharing, and leverages both a **Local Rule-Based Expert System** and **Generative AI (Groq / Llama 3.1)** to provide predictive dispatch suggestions.
+A premium, interactive, and intelligent web-based economic simulation dashboard for the **China-Kyrgyzstan-Uzbekistan (CKU) Railway**. This simulator models dynamic cargo flows, seasonal market fluctuations, regional revenue sharing, and leverages both a **Local Rule-Based Expert System** and an **LLM Dispatch Agent (DeepSeek)** to provide predictive dispatch suggestions.
 
 ---
 
@@ -18,7 +18,7 @@ A premium, interactive, and intelligent web-based economic simulation dashboard 
 
 ### 2. Dual-Core AI Cargo Dispatch Advisor
 - **Local Rule Engine**: Analyzes seasonal factors and recent monthly cargo performance using heuristics to recommend optimal volume adjustments (Top 2 increased by +15-20%, Bottom 1 reduced by -10-15%).
-- **Cloud LLM Integration**: Connects to the **Groq API (Llama 3.1)** for natural-language economic analysis. It automatically parses textual suggestions (e.g., "increase electronics by 15%") and extracts adjustment parameters to feed directly back into the simulator.
+- **LLM Dispatch Agent (DeepSeek)**: Connects to the **DeepSeek API** (`deepseek-flash`) as a closed-loop dispatch agent. The agent returns **structured JSON decisions** (no fragile text parsing), its multipliers pass through **guardrails** (clamped to 0.75~1.30, max ±10% change per month), and a **decision memory** records each adjustment's actual revenue outcome vs. baseline — fed back into the next prompt so the agent learns from its own track record.
 - **Side-by-Side Strategy Sandbox**: Simulates both the "AI-Adopted" and "Baseline (No-AI)" scenarios concurrently, offering interactive differential analysis charts (Revenue Gain, Change Rate).
 
 ### 3. High-Fidelity UI & Interactions
