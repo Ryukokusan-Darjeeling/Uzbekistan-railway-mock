@@ -245,6 +245,10 @@
           data-i18n-placeholder="ai.apiKey.placeholder"
           placeholder="可选：输入 DeepSeek API Key 获取 AI 建议（platform.deepseek.com 注册）"
         >
+        <select id="agentModeSelect" class="agent-mode-select">
+          <option value="multi" selected data-i18n="ai.mode.multi">🤖×3 多智能体</option>
+          <option value="single" data-i18n="ai.mode.single">🤖 单智能体</option>
+        </select>
         <button class="btn btn-success" id="btnGetAdvice" data-i18n="ai.btnGetAdvice">
           🧠 获取 AI 建议
         </button>

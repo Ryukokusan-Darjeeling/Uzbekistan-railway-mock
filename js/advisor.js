@@ -1,7 +1,10 @@
 // ============================================
 // AI 调度智能体 — advisor.js
-// DeepSeek API（JSON 结构化决策 + 决策记忆闭环 + 护栏校验）
-// 本地规则引擎作为降级与对照基线
+// DeepSeek API · 双模式：
+//   single — 单智能体（JSON 结构化决策 + 决策记忆闭环）
+//   multi  — 多智能体流水线（市场分析员 → 调度规划官 → 风险审查官）
+// 代码护栏（钳制/限幅）与决策记忆为两种模式共用
+// 本地规则引擎作为最终降级与对照基线
 // ============================================
 
 class CargoAdvisor {
@@ -14,6 +17,11 @@ class CargoAdvisor {
     // DeepSeek API 配置（OpenAI 兼容格式）
     this.apiEndpoint = 'https://api.deepseek.com/chat/completions';
     this.model = 'deepseek-flash';
+    this.STAGE_TIMEOUT_MS = 60000; // 单棒超时（用户确认放宽到 60s）
+    this.STAGE_RETRIES = 1;        // 每棒失败后重试次数
+
+    // 智能体模式：'single' | 'multi'
+    this.mode = 'multi';
 
     // 护栏参数
     this.MULT_MIN = 0.75;          // 运量乘数下限
@@ -25,11 +33,21 @@ class CargoAdvisor {
 
     // 上一次实际应用到模拟器的乘数（用于单月限幅计算）
     this._prevAdjustments = null;
+
+    // 流水线进度回调（由 app.js 设置，用于 UI 接力时间线）
+    this.onStageUpdate = null;
+
+    // 流水线统计（会话级）：风险审查官干预次数
+    this.pipelineStats = { riskModified: 0, riskRejected: 0 };
   }
 
   setApiKey(key) {
     this.apiKey = key.trim();
     this.useAPI = this.apiKey.length > 0;
+  }
+
+  setMode(mode) {
+    this.mode = mode === 'multi' ? 'multi' : 'single';
   }
 
   // 记录当前已应用到模拟器的乘数（由 app.js 在采纳建议时调用）
@@ -43,58 +61,69 @@ class CargoAdvisor {
 
     try {
       if (this.useAPI) {
-        return await this._getDeepSeekAdvice(simulationSummary);
-      } else {
-        return this._getLocalAdvice(simulationSummary);
+        try {
+          return this.mode === 'multi'
+            ? await this._getMultiAgentAdvice(simulationSummary)
+            : await this._getSingleAgentAdvice(simulationSummary);
+        } catch (apiError) {
+          // 不再静默降级：归一化错误后抛出，由 UI 层展示错误卡片与重试入口
+          console.error('Advisor API error:', apiError);
+          const normalized = this._normalizeError(apiError);
+          const err = new Error(normalized.detail);
+          err.advisorError = normalized;
+          throw err;
+        }
       }
-    } catch (error) {
-      console.error('Advisor error:', error);
-      // 降级到本地规则引擎
       return this._getLocalAdvice(simulationSummary);
     } finally {
       this.isLoading = false;
     }
   }
 
-  // ---- DeepSeek 智能体：感知 → 规划（JSON 结构化决策） ----
-
-  async _getDeepSeekAdvice(summary) {
-    const systemPrompt = i18n.t('advisor.prompt.system');
-    const userPrompt = this._buildPrompt(summary);
-
-    let lastError = null;
-    // DeepSeek JSON Output 有概率返回空 content，失败时重试一次
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const rawJson = await this._callDeepSeek(systemPrompt, userPrompt);
-        return this._parseAgentResponse(rawJson, summary);
-      } catch (err) {
-        console.warn(`DeepSeek attempt ${attempt + 1} failed:`, err);
-        lastError = err;
-      }
-    }
-    throw lastError;
+  // 错误归一化：timeout / http / parse / unknown
+  _normalizeError(error) {
+    const msg = (error && error.message) ? error.message : String(error);
+    if (/timeout/i.test(msg)) return { type: 'timeout', detail: msg };
+    if (/API Error/i.test(msg)) return { type: 'http', detail: msg };
+    if (/Invalid JSON|empty content|No valid adjustments/i.test(msg)) return { type: 'parse', detail: msg };
+    return { type: 'unknown', detail: msg };
   }
 
+  // ============================================
+  // 公共：DeepSeek 调用（30s 超时 · JSON 模式）
+  // ============================================
+
   async _callDeepSeek(systemPrompt, userPrompt) {
-    const response = await fetch(this.apiEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`
-      },
-      body: JSON.stringify({
-        model: this.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.5,
-        max_tokens: 1500,
-        stream: false
-      })
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.STAGE_TIMEOUT_MS);
+
+    let response;
+    try {
+      response = await fetch(this.apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.5,
+          max_tokens: 1500,
+          stream: false
+        }),
+        signal: controller.signal
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error('DeepSeek request timeout (60s)');
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
@@ -109,14 +138,329 @@ class CargoAdvisor {
     return content;
   }
 
-  // 解析智能体的 JSON 决策，执行护栏校验后转为内部结构化建议
-  _parseAgentResponse(rawJson, summary) {
-    let parsed;
+  _parseJsonStrict(raw) {
     try {
-      parsed = JSON.parse(rawJson);
+      return JSON.parse(raw);
     } catch (e) {
       throw new Error('Invalid JSON from DeepSeek: ' + e.message);
     }
+  }
+
+  // ============================================
+  // 多智能体流水线：分析员 → 规划官 → 审查官
+  // ============================================
+
+  _emitStage(stage, status, data) {
+    if (typeof this.onStageUpdate === 'function') {
+      try { this.onStageUpdate(stage, status, data); } catch { /* UI 回调异常不阻断流水线 */ }
+    }
+  }
+
+  // 单棒执行器：独立重试，进度上报
+  async _runStage(stage, systemPrompt, userPrompt, parseFn) {
+    this._emitStage(stage, 'running');
+    let lastError = null;
+    for (let attempt = 0; attempt <= this.STAGE_RETRIES; attempt++) {
+      try {
+        const raw = await this._callDeepSeek(systemPrompt, userPrompt);
+        const result = parseFn(raw);
+        this._emitStage(stage, 'done', result);
+        return result;
+      } catch (err) {
+        console.warn(`[multi-agent] stage "${stage}" attempt ${attempt + 1} failed:`, err.message);
+        lastError = err;
+      }
+    }
+    this._emitStage(stage, 'failed', { error: lastError.message });
+    throw lastError;
+  }
+
+  async _getMultiAgentAdvice(summary) {
+    // ① 市场分析员（失败可降级：规划官改用原始数据）
+    let brief = null;
+    try {
+      brief = await this._runStage(
+        'analyst',
+        i18n.t('advisor.prompt.analyst'),
+        this._buildAnalystPrompt(summary),
+        (raw) => this._parseAnalystBrief(raw)
+      );
+    } catch { brief = null; }
+
+    // ② 调度规划官（核心棒，失败则整体降级本地引擎）
+    const draft = await this._runStage(
+      'planner',
+      i18n.t('advisor.prompt.planner'),
+      this._buildPlannerPrompt(summary, brief),
+      (raw) => this._parsePlannerDraft(raw)
+    );
+
+    // ③ 风险审查官（失败可降级：直接采纳规划草案）
+    let risk = null;
+    try {
+      risk = await this._runStage(
+        'risk',
+        i18n.t('advisor.prompt.risk'),
+        this._buildRiskPrompt(draft),
+        (raw) => this._parseRiskVerdict(raw)
+      );
+    } catch { risk = null; }
+
+    return this._composeMultiAdvice(summary, brief, draft, risk);
+  }
+
+  // ---- 各棒 prompt ----
+
+  _buildAnalystPrompt(summary) {
+    const isZH = i18n.lang === 'zh';
+    let cargoInfo = '';
+    summary.cargoPerformance.forEach((c, i) => {
+      cargoInfo += isZH
+        ? `${i + 1}. ${c.name} (id=${c.id}): 收益 $${formatNumber(c.revenue)}, 运量 ${formatNumber(c.volume)}吨, 环比趋势 ${c.trend}\n`
+        : `${i + 1}. ${c.nameEn} (id=${c.id}): Revenue $${formatNumber(c.revenue)}, Volume ${formatNumber(c.volume)} tons, MoM Trend ${c.trend}\n`;
+    });
+
+    return isZH ? `
+当前模拟日期：${summary.currentDate}，已模拟 ${summary.monthsSimulated} 个月
+本月总收益：$${formatNumber(summary.monthRevenue)}（环比 ${summary.delta.percentage > 0 ? '+' : ''}${summary.delta.percentage.toFixed(1)}%）
+
+本月各货物表现（按收益排序）：
+${cargoInfo}
+请分析市场形势，并严格输出 json：
+{"trend":"简短趋势判断","description":"2-3句市场分析","opportunities":[{"id":"货物id","note":"机会说明"}],"risks":[{"id":"货物id","note":"风险说明"}],"seasonOutlook":"下月（${summary.nextMonth}）季节展望"}
+` : `
+Simulation date: ${MONTH_NAMES_EN[summary.currentMonth]} ${summary.currentYear}, ${summary.monthsSimulated} months simulated
+Monthly revenue: $${formatNumber(summary.monthRevenue)} (MoM ${summary.delta.percentage > 0 ? '+' : ''}${summary.delta.percentage.toFixed(1)}%)
+
+Cargo performance this month (sorted by revenue):
+${cargoInfo}
+Analyze the market and strictly output json:
+{"trend":"brief trend","description":"2-3 sentences of analysis","opportunities":[{"id":"cargo id","note":"opportunity"}],"risks":[{"id":"cargo id","note":"risk"}],"seasonOutlook":"outlook for next month (${MONTH_NAMES_EN[summary.nextMonthIndex]})"}
+`;
+  }
+
+  _buildPlannerPrompt(summary, brief) {
+    const isZH = i18n.lang === 'zh';
+    const memorySection = this._buildMemorySection(isZH);
+
+    let contextBlock;
+    if (brief) {
+      contextBlock = isZH
+        ? `市场分析员简报（json）：\n${JSON.stringify(brief, null, 2)}\n`
+        : `Market analyst brief (json):\n${JSON.stringify(brief, null, 2)}\n`;
+    } else {
+      // 分析员降级：直接提供原始数据
+      let cargoInfo = '';
+      summary.cargoPerformance.forEach((c) => {
+        cargoInfo += isZH
+          ? `- ${c.name} (id=${c.id}): 收益 $${formatNumber(c.revenue)}, 环比 ${c.trend}\n`
+          : `- ${c.nameEn} (id=${c.id}): Revenue $${formatNumber(c.revenue)}, MoM ${c.trend}\n`;
+      });
+      contextBlock = isZH
+        ? `（市场分析员暂不可用，以下为原始数据）\n本月总收益 $${formatNumber(summary.monthRevenue)}（环比 ${summary.delta.percentage.toFixed(1)}%）：\n${cargoInfo}`
+        : `(Market analyst unavailable, raw data below)\nMonthly revenue $${formatNumber(summary.monthRevenue)} (MoM ${summary.delta.percentage.toFixed(1)}%):\n${cargoInfo}`;
+    }
+
+    return isZH ? `
+${contextBlock}
+${memorySection}
+请为下个月（${summary.nextMonth}）制定运量调整方案，严格输出 json：
+{"increase":[{"id":"货物id","reason":"理由"},{"id":"货物id","reason":"理由"}],"decrease":[{"id":"货物id","reason":"理由"}],"strategy":["要点1","要点2","要点3","要点4"],"adjustments":{"货物id":乘数}}
+要求：increase 恰好 2 项、decrease 恰好 1 项；adjustments 至少 2 种货物，乘数 0.75~1.30（建议增运 1.05~1.20、减运 0.85~0.95）；仅可使用简报或数据中出现的货物 id；使用中文。
+` : `
+${contextBlock}
+${memorySection}
+Make a dispatch plan for next month (${MONTH_NAMES_EN[summary.nextMonthIndex]}), strictly output json:
+{"increase":[{"id":"cargo id","reason":"reason"},{"id":"cargo id","reason":"reason"}],"decrease":[{"id":"cargo id","reason":"reason"}],"strategy":["point 1","point 2","point 3","point 4"],"adjustments":{"cargo id":multiplier}}
+Requirements: exactly 2 items in increase, exactly 1 in decrease; adjustments cover at least 2 cargo types, multipliers 0.75~1.30 (suggest 1.05~1.20 for increase, 0.85~0.95 for decrease); use only cargo ids from the brief or data; reply in English.
+`;
+  }
+
+  _buildRiskPrompt(draft) {
+    const isZH = i18n.lang === 'zh';
+    const memorySection = this._buildMemorySection(isZH);
+    const prevStr = JSON.stringify(this._prevAdjustments || {});
+
+    return isZH ? `
+调度规划官的方案草案（json）：
+${JSON.stringify(draft, null, 2)}
+
+上月实际生效的乘数：${prevStr}
+${memorySection}
+请审查该方案的稳健性：单月调整是否过激（相对上月乘数变化不宜超过 ±0.10）、是否与历史失败决策雷同、增减搭配是否合理。严格输出 json：
+{"verdict":"approve 或 modify 或 reject","comment":"一句话审查意见","adjustments":{"货物id":乘数}}
+规则：approve 时原样返回草案乘数；modify 时给出修正乘数（0.75~1.30）；reject 时给出接近 1.0 的保守替代乘数。使用中文。
+` : `
+Dispatch planner's draft (json):
+${JSON.stringify(draft, null, 2)}
+
+Multipliers in effect last month: ${prevStr}
+${memorySection}
+Review this plan for robustness: is any single-month change excessive (should not exceed ±0.10 vs last month), does it repeat historically failed decisions, is the increase/decrease mix reasonable. Strictly output json:
+{"verdict":"approve or modify or reject","comment":"one-sentence review","adjustments":{"cargo id":multiplier}}
+Rules: for approve, return the draft multipliers unchanged; for modify, provide corrected multipliers (0.75~1.30); for reject, provide conservative substitutes close to 1.0. Reply in English.
+`;
+  }
+
+  // ---- 各棒输出解析（契约校验，不信任模型自觉） ----
+
+  _parseAnalystBrief(raw) {
+    const parsed = this._parseJsonStrict(raw);
+    if (typeof parsed.trend !== 'string' || !parsed.trend.trim()) {
+      throw new Error('Analyst brief missing "trend"');
+    }
+    const validIds = new Set(CARGO_TYPES.map(c => c.id));
+    const cleanList = (arr) => (Array.isArray(arr) ? arr : [])
+      .filter(it => it && validIds.has(it.id) && typeof it.note === 'string')
+      .slice(0, 3);
+
+    return {
+      trend: parsed.trend,
+      description: typeof parsed.description === 'string' ? parsed.description : '',
+      opportunities: cleanList(parsed.opportunities),
+      risks: cleanList(parsed.risks),
+      seasonOutlook: typeof parsed.seasonOutlook === 'string' ? parsed.seasonOutlook : ''
+    };
+  }
+
+  _parsePlannerDraft(raw) {
+    const parsed = this._parseJsonStrict(raw);
+    const validIds = new Set(CARGO_TYPES.map(c => c.id));
+
+    const adjustments = {};
+    Object.entries(parsed.adjustments || {}).forEach(([id, v]) => {
+      const num = parseFloat(v);
+      if (validIds.has(id) && isFinite(num)) adjustments[id] = num;
+    });
+    if (Object.keys(adjustments).length === 0) {
+      throw new Error('Planner draft has no valid adjustments');
+    }
+
+    return {
+      increase: (Array.isArray(parsed.increase) ? parsed.increase : [])
+        .filter(it => it && validIds.has(it.id)).slice(0, 2),
+      decrease: (Array.isArray(parsed.decrease) ? parsed.decrease : [])
+        .filter(it => it && validIds.has(it.id)).slice(0, 1),
+      strategy: (Array.isArray(parsed.strategy) ? parsed.strategy : [])
+        .filter(p => typeof p === 'string' && p.trim()).slice(0, 5),
+      adjustments
+    };
+  }
+
+  _parseRiskVerdict(raw) {
+    const parsed = this._parseJsonStrict(raw);
+    const verdict = ['approve', 'modify', 'reject'].includes(parsed.verdict)
+      ? parsed.verdict : 'approve';
+    const validIds = new Set(CARGO_TYPES.map(c => c.id));
+
+    const adjustments = {};
+    Object.entries(parsed.adjustments || {}).forEach(([id, v]) => {
+      const num = parseFloat(v);
+      if (validIds.has(id) && isFinite(num)) adjustments[id] = num;
+    });
+    if (Object.keys(adjustments).length === 0) {
+      throw new Error('Risk verdict has no valid adjustments');
+    }
+
+    return {
+      verdict,
+      comment: typeof parsed.comment === 'string' ? parsed.comment : '',
+      adjustments
+    };
+  }
+
+  // ---- 汇总三棒结果为最终建议 ----
+
+  _composeMultiAdvice(summary, brief, draft, risk) {
+    const isZH = i18n.lang === 'zh';
+    const delta = summary.delta;
+
+    // 最终乘数：审查官裁决 > 规划草案，再经代码护栏强制约束
+    const rawFinal = risk ? risk.adjustments : draft.adjustments;
+    const adjustments = this._sanitizeAdjustments(rawFinal);
+    if (Object.keys(adjustments).length === 0) {
+      throw new Error('Pipeline produced no valid adjustments after guardrails');
+    }
+
+    // 统计审查官干预
+    const riskVerdict = risk ? risk.verdict : 'skipped';
+    if (riskVerdict === 'modify') this.pipelineStats.riskModified++;
+    if (riskVerdict === 'reject') this.pipelineStats.riskRejected++;
+
+    // 市场趋势（来自分析员，降级时给通用文案）
+    const marketTrend = {
+      emoji: '📊',
+      trend: brief ? brief.trend : (isZH ? '数据直判' : 'Direct data read'),
+      deltaStr: `${delta.percentage > 0 ? '+' : ''}${delta.percentage.toFixed(1)}%`,
+      description: brief ? brief.description : (isZH ? '（市场分析员暂不可用，本方案基于原始数据直接规划）' : '(Analyst unavailable; plan based on raw data)')
+    };
+
+    // 增减产建议条目
+    const mapItem = (item) => {
+      const cargo = CARGO_TYPES.find(c => c.id === item.id);
+      return {
+        id: item.id,
+        name: `${cargo.emoji} ${i18n.cargoName(item.id)}`,
+        reason: item.reason || ''
+      };
+    };
+    const recommendations = [];
+    const incItems = draft.increase.map(mapItem);
+    const decItems = draft.decrease.map(mapItem);
+    if (incItems.length) recommendations.push({ type: 'increase', title: i18n.t('advisor.rec.increase'), items: incItems });
+    if (decItems.length) recommendations.push({ type: 'decrease', title: i18n.t('advisor.rec.decrease'), items: decItems });
+
+    // 策略要点 = 规划官策略 + 审查官意见
+    const points = [...draft.strategy];
+    if (risk && risk.comment) {
+      points.push(`${i18n.t('ai.risk.commentPrefix')}${risk.comment}`);
+    }
+
+    return {
+      source: isZH ? 'AI 多智能体 (DeepSeek)' : 'AI multi-agent (DeepSeek)',
+      content: null,
+      raw: false,
+      isLocal: false,
+      memoryCount: this.decisionHistory.length,
+      pipeline: {
+        mode: 'multi',
+        analystOk: !!brief,
+        riskVerdict,
+        riskComment: risk ? risk.comment : ''
+      },
+      structured: {
+        marketTrend,
+        recommendations,
+        strategy: { title: i18n.t('advisor.strategy.title'), points },
+        adjustments
+      }
+    };
+  }
+
+  // ============================================
+  // 单智能体模式（保留：一次调用出完整决策）
+  // ============================================
+
+  async _getSingleAgentAdvice(summary) {
+    const systemPrompt = i18n.t('advisor.prompt.system');
+    const userPrompt = this._buildPrompt(summary);
+
+    let lastError = null;
+    for (let attempt = 0; attempt <= this.STAGE_RETRIES; attempt++) {
+      try {
+        const rawJson = await this._callDeepSeek(systemPrompt, userPrompt);
+        return this._parseAgentResponse(rawJson, summary);
+      } catch (err) {
+        console.warn(`DeepSeek attempt ${attempt + 1} failed:`, err.message);
+        lastError = err;
+      }
+    }
+    throw lastError;
+  }
+
+  // 解析单智能体的 JSON 决策，执行护栏校验后转为内部结构化建议
+  _parseAgentResponse(rawJson, summary) {
+    const parsed = this._parseJsonStrict(rawJson);
 
     // 护栏：清洗与钳制调整乘数
     const adjustments = this._sanitizeAdjustments(parsed.adjustments || {});
@@ -166,11 +510,12 @@ class CargoAdvisor {
       .filter(p => typeof p === 'string' && p.trim()).slice(0, 5);
 
     return {
-      source: 'AI (DeepSeek)',
+      source: isZH ? 'AI 单智能体 (DeepSeek)' : 'AI single-agent (DeepSeek)',
       content: null,
       raw: false,
       isLocal: false,
       memoryCount: this.decisionHistory.length,
+      pipeline: { mode: 'single' },
       structured: {
         marketTrend,
         recommendations,
@@ -183,7 +528,9 @@ class CargoAdvisor {
     };
   }
 
-  // ---- 护栏层：钳制 + 单月限幅，不信任 LLM 的原始输出 ----
+  // ============================================
+  // 护栏层：钳制 + 单月限幅（代码强制，不信任 LLM）
+  // ============================================
 
   _sanitizeAdjustments(rawAdjustments) {
     const sanitized = {};
@@ -211,7 +558,9 @@ class CargoAdvisor {
     return sanitized;
   }
 
-  // ---- 决策记忆（智能体闭环反馈） ----
+  // ============================================
+  // 决策记忆（闭环反馈，两种模式共用）
+  // ============================================
 
   _loadMemory() {
     try {
@@ -260,11 +609,11 @@ class CargoAdvisor {
     });
 
     return isZH
-      ? `\n你的历史决策及其实际效果（请从中学习，避免重复无效决策）：\n${lines.join('\n')}\n`
-      : `\nYour past decisions and their actual outcomes (learn from them, avoid repeating ineffective moves):\n${lines.join('\n')}\n`;
+      ? `\n历史决策及其实际效果（请从中学习，避免重复无效决策）：\n${lines.join('\n')}\n`
+      : `\nPast decisions and their actual outcomes (learn from them, avoid repeating ineffective moves):\n${lines.join('\n')}\n`;
   }
 
-  // ---- Prompt 构建（含 JSON 输出契约与决策记忆） ----
+  // ---- 单智能体 prompt（含 JSON 输出契约与决策记忆） ----
 
   _buildPrompt(summary) {
     let cargoInfo = '';
@@ -326,7 +675,9 @@ Requirements: exactly 2 items in increase, exactly 1 in decrease; adjustments mu
     }
   }
 
-  // ---- 本地规则引擎（降级方案与对照基线） ----
+  // ============================================
+  // 本地规则引擎（最终降级与对照基线）
+  // ============================================
 
   _getLocalAdvice(summary) {
     const { cargoPerformance, nextMonthIndex, delta, monthsSimulated } = summary;
@@ -424,6 +775,7 @@ Requirements: exactly 2 items in increase, exactly 1 in decrease; adjustments mu
       raw: false,
       isLocal: true,
       memoryCount: this.decisionHistory.length,
+      pipeline: { mode: 'local' },
       structured: {
         marketTrend: {
           emoji: trendEmoji,
@@ -474,7 +826,10 @@ Requirements: exactly 2 items in increase, exactly 1 in decrease; adjustments mu
     return adjustments;
   }
 
-  // Format advice as HTML（本地引擎与 DeepSeek 智能体共用结构化渲染）
+  // ============================================
+  // 渲染（本地/单智能体/多智能体共用结构化渲染）
+  // ============================================
+
   static formatAdviceHTML(advice) {
     if (advice.raw) {
       // 原始文本兜底渲染（保留以防旧数据）
@@ -497,11 +852,30 @@ Requirements: exactly 2 items in increase, exactly 1 in decrease; adjustments mu
       ? i18n.t('advisor.source.localNote')
       : i18n.t('advisor.source.aiMemory', advice.memoryCount || 0);
 
+    // 多智能体流水线徽标
+    let pipelineBadge = '';
+    if (advice.pipeline && advice.pipeline.mode === 'multi') {
+      const p = advice.pipeline;
+      const analystMark = p.analystOk ? '✓' : '✗';
+      const verdictText = p.riskVerdict === 'skipped'
+        ? i18n.t('ai.risk.skipped')
+        : i18n.t(`ai.risk.${p.riskVerdict}`);
+      pipelineBadge = `
+        <div class="pipeline-badge">
+          <span>${i18n.t('ai.stage.analyst')} ${analystMark}</span>
+          <span class="pipeline-badge-sep">→</span>
+          <span>${i18n.t('ai.stage.planner')} ✓</span>
+          <span class="pipeline-badge-sep">→</span>
+          <span>${i18n.t('ai.stage.risk')}：${verdictText}</span>
+        </div>
+      `;
+    }
+
     let html = `
       <div style="margin-bottom:8px;font-size:0.75rem;color:var(--text-muted)">
         🧠 ${i18n.t('ai.title')}: ${advice.source} (${sourceNote})
       </div>
-
+      ${pipelineBadge}
       <h3 style="margin-bottom:12px">${marketTrend.emoji} ${i18n.t('advisor.market.trend')}：${marketTrend.trend} (${marketTrend.deltaStr})</h3>
       <p style="margin-bottom:16px;color:var(--text-secondary)">${marketTrend.description}</p>
     `;

@@ -1,6 +1,6 @@
 # CKU Railway Economic Simulator (Uzbekistan-railway-mock)
 
-A premium, interactive, and intelligent web-based economic simulation dashboard for the **China-Kyrgyzstan-Uzbekistan (CKU) Railway**. This simulator models dynamic cargo flows, seasonal market fluctuations, regional revenue sharing, and leverages both a **Local Rule-Based Expert System** and an **LLM Dispatch Agent (DeepSeek)** to provide predictive dispatch suggestions.
+A premium, interactive, and intelligent web-based economic simulation dashboard for the **China-Kyrgyzstan-Uzbekistan (CKU) Railway**. This simulator models dynamic cargo flows, seasonal market fluctuations, regional revenue sharing, and leverages both a **Local Rule-Based Expert System** and a **Multi-Agent LLM Dispatch Pipeline (DeepSeek)** to provide predictive dispatch suggestions.
 
 ---
 
@@ -17,8 +17,15 @@ A premium, interactive, and intelligent web-based economic simulation dashboard 
   - **Europe Connection** (~4,000 km / 30% revenue share)
 
 ### 2. Dual-Core AI Cargo Dispatch Advisor
-- **Local Rule Engine**: Analyzes seasonal factors and recent monthly cargo performance using heuristics to recommend optimal volume adjustments (Top 2 increased by +15-20%, Bottom 1 reduced by -10-15%).
-- **LLM Dispatch Agent (DeepSeek)**: Connects to the **DeepSeek API** (`deepseek-flash`) as a closed-loop dispatch agent. The agent returns **structured JSON decisions** (no fragile text parsing), its multipliers pass through **guardrails** (clamped to 0.75~1.30, max ±10% change per month), and a **decision memory** records each adjustment's actual revenue outcome vs. baseline — fed back into the next prompt so the agent learns from its own track record.
+- **Local Rule Engine**: Analyzes seasonal factors and recent monthly cargo performance using heuristics to recommend optimal volume adjustments (Top 2 increased by +15-20%, Bottom 1 reduced by -10-15%). Serves as both the offline fallback and the A/B comparison baseline.
+- **Multi-Agent Dispatch Pipeline (DeepSeek, default mode)**: Three role agents run as a sequential pipeline over the **DeepSeek API** (`deepseek-flash`), communicating exclusively through validated JSON contracts:
+  1. **Market Analyst** — compresses raw monthly data into a market brief (trend, opportunities, risks, season outlook);
+  2. **Dispatch Planner** — turns the brief plus decision memory into a draft plan (recommendations + volume multipliers);
+  3. **Risk Officer** — reviews the draft with an **approve / modify / reject** verdict; review comments are injected into the final strategy.
+- **Single-Agent Mode**: The original one-shot JSON decision agent is fully preserved — switchable in the UI for A/B comparison and as a lighter alternative.
+- **Robustness Engineering**: Each stage has a 60s timeout (AbortController) plus one retry, and degrades independently (analyst failure → planner uses raw data; risk officer failure → draft adopted as-is). All final multipliers pass through **code-enforced guardrails** (clamped to 0.75~1.30, max ±10% change per month) regardless of LLM output. API failures surface as a categorized **error card with retry / local-engine buttons** — never a silent fallback.
+- **Closed-Loop Decision Memory**: Every applied adjustment's actual revenue outcome vs. baseline is recorded (persisted in localStorage, up to 12 months) and injected into future prompts, so the agents learn from their own track record.
+- **Live Pipeline Timeline UI**: Watch the three stages light up in sequence (pending → running → done/failed), with a pipeline badge on the advice card summarizing the review verdict.
 - **Side-by-Side Strategy Sandbox**: Simulates both the "AI-Adopted" and "Baseline (No-AI)" scenarios concurrently, offering interactive differential analysis charts (Revenue Gain, Change Rate).
 
 ### 3. High-Fidelity UI & Interactions
@@ -75,6 +82,44 @@ To run this application locally, you only need a modern web browser and a simple
 
 3. **Open the browser**:
    Navigate to `http://localhost:8000` to launch the simulator.
+
+### DeepSeek API Key (optional, enables LLM agents)
+
+Without a key, the simulator runs on the local rule engine. To enable the LLM agents, either:
+
+- **Paste the key in the UI** input field (session-only), or
+- **Configure it locally** — create `js/config.local.js` (already gitignored):
+  ```js
+  window.DEEPSEEK_API_KEY = 'sk-your-key-here';
+  ```
+  Get a key at [platform.deepseek.com](https://platform.deepseek.com).
+
+---
+
+## 🤖 Multi-Agent Architecture
+
+```
+Monthly simulation data
+        │
+        ▼
+① Market Analyst ──► market brief (JSON)
+        │
+        ▼
+② Dispatch Planner ──► draft plan (JSON)  ◄── decision memory (past outcomes)
+        │
+        ▼
+③ Risk Officer ──► verdict: approve / modify / reject (JSON)
+        │
+        ▼
+Code guardrails (clamp 0.75~1.30, ±10%/month) ──► volume multipliers M_i
+        │
+        ▼
+Next month simulation ──► actual vs baseline revenue ──► back into decision memory
+```
+
+- **Orchestration**: `js/app.js` sequences the stages; all roles share one DeepSeek client with per-stage 60s timeout + 1 retry.
+- **Contracts**: each role has a dedicated system prompt and strict JSON schema; outputs are field-validated before entering the next stage.
+- **Failure handling**: analyst failure → planner uses raw data; risk officer failure → draft adopted as-is; planner failure / timeout → categorized error card with **Retry** and **Use local engine** buttons.
 
 ---
 
