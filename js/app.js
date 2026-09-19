@@ -36,6 +36,10 @@ class App {
     if (apiKeyInput && this.advisor.useAPI) {
       apiKeyInput.value = this.advisor.apiKey;
     }
+
+    // 同步智能体模式选择器（默认多智能体）
+    const modeSelect = document.getElementById('agentModeSelect');
+    if (modeSelect) this.advisor.setMode(modeSelect.value);
     
     // Register language change listener to refresh UI & Charts dynamically
     i18n.onChange(() => {
@@ -101,6 +105,14 @@ class App {
     });
 
     document.getElementById('btnGetAdvice').addEventListener('click', () => this.getAdvice());
+
+    document.getElementById('agentModeSelect')?.addEventListener('change', (e) => {
+      this.advisor.setMode(e.target.value);
+      this.ui.showToast(
+        e.target.value === 'multi' ? i18n.t('toast.modeMulti') : i18n.t('toast.modeSingle'),
+        'info'
+      );
+    });
     document.getElementById('aiToggle')?.addEventListener('change', (e) => this._toggleAI(e.target.checked));
     document.getElementById('btnExportComparison')?.addEventListener('click', () => this._showComparisonChart());
 
@@ -221,50 +233,124 @@ class App {
     this.ui.showToast(i18n.t('toast.reset'), 'info');
   }
 
+  // 多智能体流水线时间线渲染
+  _renderPipelineHTML(stageStates) {
+    const stages = ['analyst', 'planner', 'risk'];
+    const icons = {
+      pending: '<span class="stage-icon pending">·</span>',
+      running: '<span class="stage-spinner"></span>',
+      done: '<span class="stage-icon done">✓</span>',
+      failed: '<span class="stage-icon failed">✗</span>'
+    };
+    const items = stages.map(s => {
+      const st = stageStates[s] || 'pending';
+      return `
+        <div class="pipeline-stage ${st}">
+          ${icons[st]}
+          <span class="stage-name">${i18n.t('ai.stage.' + s)}</span>
+          <span class="stage-status">${i18n.t('ai.stage.status.' + st)}</span>
+        </div>
+      `;
+    });
+    return `<div class="pipeline">${items.join('<div class="pipeline-arrow">↓</div>')}</div>`;
+  }
+
   async getAdvice() {
     const resultEl = document.getElementById('advisorResult');
     if (!resultEl) return;
 
-    resultEl.innerHTML = `
-      <div class="advisor-result loading" style="display:flex;align-items:center;gap:12px">
-        <div class="typing-dots"><span></span><span></span><span></span></div>
-        <span>${i18n.t('ai.loading')}</span>
-      </div>
-    `;
+    // 多智能体模式：渲染流水线接力时间线；其他模式：打字动画
+    const usePipelineUI = this.advisor.useAPI && this.advisor.mode === 'multi';
+    if (usePipelineUI) {
+      const stageStates = { analyst: 'pending', planner: 'pending', risk: 'pending' };
+      const renderPipeline = () => { resultEl.innerHTML = this._renderPipelineHTML(stageStates); };
+      renderPipeline();
+      this.advisor.onStageUpdate = (stage, status) => {
+        stageStates[stage] = status;
+        renderPipeline();
+      };
+    } else {
+      resultEl.innerHTML = `
+        <div class="advisor-result loading" style="display:flex;align-items:center;gap:12px">
+          <div class="typing-dots"><span></span><span></span><span></span></div>
+          <span>${i18n.t('ai.loading')}</span>
+        </div>
+      `;
+    }
 
     // 决策前先把已模拟月份的实际效果写入智能体记忆，形成闭环
     this._syncAdvisorMemory();
 
     const summary = this.sim.getSimulationSummary();
-    const advice = await this.advisor.getAdvice(summary);
+
+    let advice;
+    try {
+      advice = await this.advisor.getAdvice(summary);
+    } catch (err) {
+      // API 失败/超时：展示错误卡片 + 重试/本地引擎按钮
+      this.advisor.onStageUpdate = null;
+      const info = err.advisorError || { type: 'unknown', detail: err.message || String(err) };
+      resultEl.innerHTML = this._renderAgentErrorHTML(info);
+      document.getElementById('btnRetryAdvice')?.addEventListener('click', () => this.getAdvice());
+      document.getElementById('btnUseLocalEngine')?.addEventListener('click', () => {
+        const localAdvice = this.advisor._getLocalAdvice(this.sim.getSimulationSummary());
+        this._applyAdvice(localAdvice, resultEl);
+      });
+      return;
+    }
+
+    this.advisor.onStageUpdate = null;
 
     if (advice) {
-      this.lastAdvice = advice;
-      resultEl.innerHTML = CargoAdvisor.formatAdviceHTML(advice);
-
-      // DeepSeek 智能体与本地引擎均以结构化 adjustments 返回，无需再解析自然语言
-      this.lastAdjustments = advice.structured?.adjustments || {};
-
-      this.ui.updateAdjustmentsPreview(this.lastAdjustments);
-
-      const toggle = document.getElementById('aiToggle');
-      if (toggle && toggle.checked) {
-        this.sim.setAIAdjustments(this.lastAdjustments);
-        this.advisor.setPrevAdjustments(this.lastAdjustments);
-        const statusText = document.getElementById('aiStatusText');
-        const statusDot = document.getElementById('aiStatusBadge')?.querySelector('.status-dot');
-        if (statusText) statusText.textContent = i18n.t('ai.status.on');
-        if (statusDot) statusDot.className = 'status-dot on';
-        const preview = document.getElementById('aiAdjustmentsPreview');
-        if (preview) preview.style.display = 'block';
-      }
-
-      const exportBtn = document.getElementById('btnExportComparison');
-      if (exportBtn) exportBtn.disabled = false;
-      this.ui.showToast(i18n.t('toast.adviceGenerated'), 'success');
+      this._applyAdvice(advice, resultEl);
     } else {
       resultEl.innerHTML = `<span class="text-red">⚠️ ${i18n.t('ai.error')}</span>`;
     }
+  }
+
+  // 渲染智能体错误卡片（失败/超时）
+  _renderAgentErrorHTML(info) {
+    return `
+      <div class="agent-error">
+        <div class="agent-error-icon">⚠️</div>
+        <div class="agent-error-body">
+          <div class="agent-error-title">${i18n.t('ai.error.title')}</div>
+          <div class="agent-error-msg">${i18n.t('ai.error.' + info.type)}</div>
+          <div class="agent-error-detail">${info.detail}</div>
+          <div class="agent-error-actions">
+            <button class="btn btn-success" id="btnRetryAdvice">${i18n.t('ai.error.retry')}</button>
+            <button class="btn btn-export" id="btnUseLocalEngine">${i18n.t('ai.error.useLocal')}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // 应用建议到 UI 与模拟器（AI/本地引擎共用）
+  _applyAdvice(advice, resultEl) {
+    this.lastAdvice = advice;
+    resultEl.innerHTML = CargoAdvisor.formatAdviceHTML(advice);
+
+    // DeepSeek 智能体与本地引擎均以结构化 adjustments 返回，无需再解析自然语言
+    this.lastAdjustments = advice.structured?.adjustments || {};
+
+    this.ui.updateAdjustmentsPreview(this.lastAdjustments);
+
+    const toggle = document.getElementById('aiToggle');
+    if (toggle && toggle.checked) {
+      this.sim.setAIAdjustments(this.lastAdjustments);
+      this.advisor.setPrevAdjustments(this.lastAdjustments);
+      const statusText = document.getElementById('aiStatusText');
+      const statusDot = document.getElementById('aiStatusBadge')?.querySelector('.status-dot');
+      if (statusText) statusText.textContent = i18n.t('ai.status.on');
+      if (statusDot) statusDot.className = 'status-dot on';
+      const preview = document.getElementById('aiAdjustmentsPreview');
+      if (preview) preview.style.display = 'block';
+    }
+
+    const exportBtn = document.getElementById('btnExportComparison');
+    if (exportBtn) exportBtn.disabled = false;
+    this.ui.showToast(i18n.t('toast.adviceGenerated'), 'success');
   }
 
   _showComparisonChart() {
