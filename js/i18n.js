@@ -24,7 +24,7 @@ const I18N = {
     'map.legend.china': '🇨🇳 中国段 (213km)',
     'map.legend.kyrgyzstan': '🇰🇬 吉尔吉斯斯坦段 (300km)',
     'map.legend.uzbekistan': '🇺🇿 乌兹别克斯坦段 (60km)',
-    'map.legend.europe': '🇪🇺 欧洲连线 (虚线)',
+    'map.legend.europe': '🇪🇺 欧洲连线',
 
     // Stat Cards
     'stat.totalRevenue.label': '📊 累计总收益',
@@ -68,7 +68,7 @@ const I18N = {
     'ai.status.off': '未采纳 AI 建议',
     'ai.status.on': '已采纳 AI 建议 ✓',
     'ai.status.pending': '请先获取 AI 建议',
-    'ai.apiKey.placeholder': '可选：输入 Groq API Key 获取 AI 建议（免费注册 groq.com）',
+    'ai.apiKey.placeholder': '可选：输入 DeepSeek API Key 获取 AI 建议（platform.deepseek.com 注册）',
     'ai.btnGetAdvice': '🧠 获取 AI 建议',
     'ai.btnExport': '📊 导出对比图',
     'ai.result.placeholder': '点击「获取 AI 建议」按钮获取货物调度建议。未设置 API Key 时将使用本地分析引擎。',
@@ -87,7 +87,7 @@ const I18N = {
     'algo.baseline.price': '<span class="algo-tag stochastic">随机性</span><strong>价格波动 ±15%</strong>：每种货物的单价基于基准价上下浮动 15%，模拟市场不确定性',
     'algo.baseline.region': '<span class="algo-tag deterministic">确定性</span><strong>固定比例区域分配</strong>：中国段 30%、吉尔吉斯斯坦段 25%、乌兹别克斯坦段 15%、欧洲连线 30%',
     'algo.ai.title': 'AI 调控算法（开启 AI 后）',
-    'algo.ai.desc': 'AI 调控模式下，系统使用<strong>规则基专家系统（Rule-Based Expert System）</strong>或外部 <strong>LLM（Groq / Llama 3.1）</strong> 生成调度建议。',
+    'algo.ai.desc': 'AI 调控模式下，系统使用<strong>规则基专家系统（Rule-Based Expert System）</strong>或外部 <strong>LLM 智能体（DeepSeek）</strong> 生成调度建议。智能体以结构化 JSON 输出决策，并结合历史决策的实际效果自我修正。',
     'algo.ai.seasonal': '<span class="algo-tag ai">本地引擎</span><strong>季节趋势分析</strong>：对比相邻月份的季节因子变化，识别上升/下降趋势',
     'algo.ai.ranking': '<span class="algo-tag ai">本地引擎</span><strong>绩效排序</strong>：按当月收益降序排列，推荐增加 Top 2、减少 Bottom 1 的运量',
     'algo.ai.heuristic': '<span class="algo-tag ai">本地引擎</span><strong>启发式调整</strong>：季节因子上升 → 增量 +15~20%；下降 → 减量 -10~15%',
@@ -124,7 +124,7 @@ const I18N = {
     'toast.advance.ai': ' (AI 调控生效中)',
     'toast.advance6': '⏩ 已快进 6 个月',
     'toast.reset': '🔄 模拟器已重置到 2026年1月',
-    'toast.apiKeySet': '🔑 API Key 已设置，将使用 Groq AI',
+    'toast.apiKeySet': '🔑 API Key 已设置，将使用 DeepSeek AI',
     'toast.aiOn': '🤖 AI 调控已开启，下月模拟将采纳 AI 建议',
     'toast.aiNeedAdvice': '⚠️ 请先点击「获取 AI 建议」，再开启 AI 调控',
     'toast.aiOff': 'AI 调控已关闭',
@@ -143,6 +143,7 @@ const I18N = {
     // Advisor local engine
     'advisor.source.local': '本地规则引擎',
     'advisor.source.localNote': '未配置 API Key，使用本地分析引擎',
+    'advisor.source.aiMemory': (n) => n > 0 ? `DeepSeek 智能体 · 已积累 ${n} 期决策记忆` : 'DeepSeek 智能体 · 结构化决策',
     'advisor.market.strongUp': '强劲上升',
     'advisor.market.steadyGrow': '稳步增长',
     'advisor.market.fluctuate': '小幅波动',
@@ -162,7 +163,7 @@ const I18N = {
     'advisor.strategy.expand': '当前势头良好，可适度扩大总运量 5-10%',
     'advisor.strategy.optimize': '市场出现回调，建议优化货物结构而非盲目扩量',
     'advisor.strategy.layout': '建议在马克马尔换装站提前布局热门货物，减少换装等待时间',
-    'advisor.prompt.system': '你是一个专业的铁路货物调度顾问，精通中吉乌铁路（中国-吉尔吉斯斯坦-乌兹别克斯坦铁路）的货物运输市场。你需要根据当前数据，为下个月的货物调度提供具体、可操作的建议。回复请使用中文，格式清晰，分点列出建议。',
+    'advisor.prompt.system': '你是中吉乌铁路（中国-吉尔吉斯斯坦-乌兹别克斯坦）的货运调度智能体，负责根据每月运营数据动态调整各类货物的运量配比。你必须只输出合法的 json 对象，不得输出任何其他文字或 markdown 代码块。json 结构为：{"marketTrend":{"trend":"简短趋势判断","description":"市场分析"},"increase":[{"id":"货物id","reason":"增运理由"}],"decrease":[{"id":"货物id","reason":"减运理由"}],"strategy":["策略要点"],"adjustments":{"货物id":运量乘数}}。全部内容使用中文。',
 
     // Cargo names
     'cargo.electronics': '电子产品',
@@ -212,7 +213,7 @@ const I18N = {
     'map.legend.china': '🇨🇳 China Section (213km)',
     'map.legend.kyrgyzstan': '🇰🇬 Kyrgyzstan Section (300km)',
     'map.legend.uzbekistan': '🇺🇿 Uzbekistan Section (60km)',
-    'map.legend.europe': '🇪🇺 Europe Connection (dashed)',
+    'map.legend.europe': '🇪🇺 Europe Connection',
 
     // Stat Cards
     'stat.totalRevenue.label': '📊 Total Revenue',
@@ -256,7 +257,7 @@ const I18N = {
     'ai.status.off': 'AI advice not adopted',
     'ai.status.on': 'AI advice adopted ✓',
     'ai.status.pending': 'Get AI advice first',
-    'ai.apiKey.placeholder': 'Optional: Enter Groq API Key for AI advice (free at groq.com)',
+    'ai.apiKey.placeholder': 'Optional: Enter DeepSeek API Key for AI advice (sign up at platform.deepseek.com)',
     'ai.btnGetAdvice': '🧠 Get AI Advice',
     'ai.btnExport': '📊 Export Comparison',
     'ai.result.placeholder': 'Click "Get AI Advice" to generate cargo dispatch suggestions. Local analysis engine is used without API Key.',
@@ -275,11 +276,11 @@ const I18N = {
     'algo.baseline.price': '<span class="algo-tag stochastic">Stochastic</span><strong>Price Fluctuation ±15%</strong>: Unit price fluctuates ±15% around base price, simulating market uncertainty',
     'algo.baseline.region': '<span class="algo-tag deterministic">Deterministic</span><strong>Fixed Regional Allocation</strong>: China 30%, Kyrgyzstan 25%, Uzbekistan 15%, Europe 30%',
     'algo.ai.title': 'AI Control Algorithm (with AI enabled)',
-    'algo.ai.desc': 'In AI mode, the system uses a <strong>Rule-Based Expert System</strong> or external <strong>LLM (Groq / Llama 3.1)</strong> to generate dispatch advice.',
+    'algo.ai.desc': 'In AI mode, the system uses a <strong>Rule-Based Expert System</strong> or an external <strong>LLM agent (DeepSeek)</strong> to generate dispatch advice. The agent outputs structured JSON decisions and self-corrects using the actual outcomes of past decisions.',
     'algo.ai.seasonal': '<span class="algo-tag ai">Local Engine</span><strong>Seasonal Trend Analysis</strong>: Compares adjacent months\' seasonal factors to identify trends',
     'algo.ai.ranking': '<span class="algo-tag ai">Local Engine</span><strong>Performance Ranking</strong>: Sorts by current revenue, recommends increasing Top 2 and decreasing Bottom 1',
     'algo.ai.heuristic': '<span class="algo-tag ai">Local Engine</span><strong>Heuristic Adjustment</strong>: Rising season factor → +15~20%; falling → -10~15%',
-    'algo.ai.llm': '<span class="algo-tag ai">LLM Mode</span><strong>NLP Parsing</strong>: Extracts volume adjustment multipliers from AI response (capped at ±30%)',
+    'algo.ai.llm': '<span class="algo-tag ai">LLM Agent</span><strong>Structured decision loop</strong>: DeepSeek outputs volume multipliers directly in JSON (clamped to 0.75~1.30, max ±10% change per month) and self-corrects by learning from actual revenue deviations of past decisions',
     'algo.ai.baseline': '<span class="algo-tag deterministic">Baseline Ref</span><strong>Baseline Comparison</strong>: Records baseline revenue alongside AI-adjusted revenue for effect comparison',
     'algo.summary': 'Baseline simulation relies entirely on <strong>random sampling + fixed seasonal factors</strong>; AI mode proactively analyzes market data and optimizes cargo mix by <strong>adjusting volume multiplier M</strong>. Both modes share the same price fluctuation and growth models, differing only in volume decisions.',
 
@@ -312,7 +313,7 @@ const I18N = {
     'toast.advance.ai': ' (AI Control Active)',
     'toast.advance6': '⏩ Skipped 6 months',
     'toast.reset': '🔄 Simulator reset to Jan 2026',
-    'toast.apiKeySet': '🔑 API Key set, using Groq AI',
+    'toast.apiKeySet': '🔑 API Key set, using DeepSeek AI',
     'toast.aiOn': '🤖 AI Control enabled, advice applied next month',
     'toast.aiNeedAdvice': '⚠️ Please get AI advice first before enabling AI Control',
     'toast.aiOff': 'AI Control disabled',
@@ -350,7 +351,7 @@ const I18N = {
     'advisor.strategy.expand': 'Current momentum is positive, consider expanding total volume by 5-10%',
     'advisor.strategy.optimize': 'Market is pulling back, recommend optimizing cargo mix rather than blindly expanding',
     'advisor.strategy.layout': 'Pre-position popular cargo at Makmal transshipment station to reduce handling wait times',
-    'advisor.prompt.system': 'You are a professional railway cargo dispatch advisor specializing in the CKU Railway (China-Kyrgyzstan-Uzbekistan). Based on current data, provide specific, actionable advice for next month\'s cargo dispatch. Reply in English with clear, structured recommendations.',
+    'advisor.prompt.system': 'You are the cargo dispatch agent for the CKU Railway (China-Kyrgyzstan-Uzbekistan), dynamically adjusting cargo volume allocation based on monthly operational data. You must output only a valid json object, with no extra text or markdown code blocks. The json structure is: {"marketTrend":{"trend":"brief trend","description":"market analysis"},"increase":[{"id":"cargo id","reason":"reason"}],"decrease":[{"id":"cargo id","reason":"reason"}],"strategy":["strategy point"],"adjustments":{"cargo id":volume multiplier}}. Reply entirely in English.',
 
     // Cargo names
     'cargo.electronics': 'Electronics',

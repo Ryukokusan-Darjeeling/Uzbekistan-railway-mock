@@ -17,24 +17,24 @@ class RailwayMap {
     // Railway route coordinates
     this.stations = [
       { name: '喀什 Kashgar', lat: 39.47, lng: 75.99, region: 'china', major: true },
-      { name: '阿图什 Artux', lat: 39.72, lng: 76.17, region: 'china', major: false },
+      { name: '阿图什 Artux', lat: 39.72, lng: 76.17, region: 'china', major: true },
       { name: '吐尔尕特 Torugart', lat: 40.52, lng: 75.34, region: 'china', major: true },
-      { name: '阿尔帕 Arpa', lat: 40.70, lng: 74.80, region: 'kyrgyzstan', major: false },
-      { name: '纳伦 Naryn', lat: 41.43, lng: 76.00, region: 'kyrgyzstan', major: false },
+      { name: '阿尔帕 Arpa', lat: 40.70, lng: 74.80, region: 'kyrgyzstan', major: true },
+      { name: '纳伦 Naryn', lat: 41.43, lng: 76.00, region: 'kyrgyzstan', major: true },
       { name: '马克马尔 Makmal', lat: 41.25, lng: 73.50, region: 'kyrgyzstan', major: true },
       { name: '贾拉拉巴德 Jalal-Abad', lat: 40.93, lng: 73.00, region: 'kyrgyzstan', major: true },
-      { name: '卡拉苏 Kara-Suu', lat: 40.70, lng: 72.85, region: 'kyrgyzstan', major: false },
+      { name: '卡拉苏 Kara-Suu', lat: 40.70, lng: 72.85, region: 'kyrgyzstan', major: true },
       { name: '安集延 Andijan', lat: 40.78, lng: 72.34, region: 'uzbekistan', major: true },
       { name: '塔什干 Tashkent', lat: 41.30, lng: 69.28, region: 'uzbekistan', major: true },
     ];
 
     // Extended route to Europe (simplified)
     this.europeStations = [
-      { name: '撒马尔罕 Samarkand', lat: 39.65, lng: 66.96, region: 'europe', major: false },
-      { name: '布哈拉 Bukhara', lat: 39.77, lng: 64.42, region: 'europe', major: false },
-      { name: '土库曼巴什 Turkmenbashi', lat: 40.05, lng: 52.96, region: 'europe', major: false },
-      { name: '巴库 Baku', lat: 40.41, lng: 49.87, region: 'europe', major: false },
-      { name: '第比利斯 Tbilisi', lat: 41.72, lng: 44.79, region: 'europe', major: false },
+      { name: '撒马尔罕 Samarkand', lat: 39.65, lng: 66.96, region: 'europe', major: true },
+      { name: '布哈拉 Bukhara', lat: 39.77, lng: 64.42, region: 'europe', major: true },
+      { name: '土库曼巴什 Turkmenbashi', lat: 40.05, lng: 52.96, region: 'europe', major: true },
+      { name: '巴库 Baku', lat: 40.41, lng: 49.87, region: 'europe', major: true },
+      { name: '第比利斯 Tbilisi', lat: 41.72, lng: 44.79, region: 'europe', major: true },
       { name: '伊斯坦布尔 Istanbul', lat: 41.01, lng: 28.98, region: 'europe', major: true },
     ];
 
@@ -77,8 +77,6 @@ class RailwayMap {
     this._buildRouteCoords();
     this._drawRoutes();
     this._addStations();
-    this._addTrainMarker();
-    this._startTrainAnimation();
 
     return this;
   }
@@ -130,7 +128,7 @@ class RailwayMap {
         opacity: 0.8,
         smoothFactor: 1.5,
         lineCap: 'round',
-        dashArray: regionId === 'europe' ? '10, 8' : null
+        dashArray: null
       }).addTo(this.map);
 
       // Click handler

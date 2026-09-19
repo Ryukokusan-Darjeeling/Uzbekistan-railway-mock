@@ -12,6 +12,8 @@ class App {
     this.ui = null;
     this.lastAdvice = null;
     this.lastAdjustments = null;
+    // 智能体决策记忆已同步到的收益历史长度
+    this._memorySyncedCount = 0;
   }
 
   init() {
@@ -28,6 +30,12 @@ class App {
     this.ui = new UIManager(this.sim);
 
     this._bindEvents();
+
+    // 本地配置已提供 API Key 时，回填输入框（password 掩码显示），无需手动输入
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    if (apiKeyInput && this.advisor.useAPI) {
+      apiKeyInput.value = this.advisor.apiKey;
+    }
     
     // Register language change listener to refresh UI & Charts dynamically
     i18n.onChange(() => {
@@ -35,10 +43,11 @@ class App {
       this.charts.updateLocale();
 
       // If we already have local AI advice, regenerate it in the new language
+      // （DeepSeek 智能体建议为 API 返回内容，不重新生成，避免重复计费）
       if (this.lastAdvice) {
         const resultEl = document.getElementById('advisorResult');
         if (resultEl) {
-          if (!this.lastAdvice.raw) {
+          if (this.lastAdvice.isLocal) {
             const summary = this.sim.getSimulationSummary();
             this.lastAdvice = this.advisor._getLocalAdvice(summary);
           }
@@ -68,6 +77,7 @@ class App {
 
     document.getElementById('btnAdvance6').addEventListener('click', () => {
       for (let i = 0; i < 6; i++) this.sim.advanceMonth();
+      this._syncAdvisorMemory();
       this._updateAll();
       this.ui.showToast(i18n.t('toast.advance6'), 'info');
     });
@@ -109,6 +119,25 @@ class App {
     });
   }
 
+  // ---- 智能体反馈闭环：把已模拟月份的实际效果写入决策记忆 ----
+  _syncAdvisorMemory() {
+    const history = this.sim.getRevenueComparisonData();
+    for (let i = this._memorySyncedCount; i < history.length; i++) {
+      const h = history[i];
+      if (h.aiApplied && h.adjustments) {
+        const outcomePct = h.baselineRevenue > 0
+          ? parseFloat(((h.actualRevenue - h.baselineRevenue) / h.baselineRevenue * 100).toFixed(1))
+          : 0;
+        this.advisor.learnFromOutcome({
+          month: h.label,
+          adjustments: h.adjustments,
+          outcomePct
+        });
+      }
+    }
+    this._memorySyncedCount = history.length;
+  }
+
   // ---- AI Toggle Logic ----
   _toggleAI(enabled) {
     this.sim.setAIEnabled(enabled);
@@ -122,6 +151,7 @@ class App {
     if (enabled) {
       if (this.lastAdjustments && Object.keys(this.lastAdjustments).length > 0) {
         this.sim.setAIAdjustments(this.lastAdjustments);
+        this.advisor.setPrevAdjustments(this.lastAdjustments);
         statusText.textContent = i18n.t('ai.status.on');
         statusDot.className = 'status-dot on';
         toggleLabel.classList.add('active');
@@ -136,6 +166,7 @@ class App {
       if (exportBtn) exportBtn.disabled = false;
     } else {
       this.sim.setAIAdjustments({});
+      this.advisor.setPrevAdjustments(null);
       statusText.textContent = i18n.t('ai.status.off');
       statusDot.className = 'status-dot off';
       toggleLabel.classList.remove('active');
@@ -146,6 +177,7 @@ class App {
 
   advanceMonth() {
     this.sim.advanceMonth();
+    this._syncAdvisorMemory();
     this._updateAll();
     const data = this.sim.getLatestMonthData();
     
@@ -173,6 +205,10 @@ class App {
 
     this.lastAdvice = null;
     this.lastAdjustments = null;
+    // 新一轮模拟：清空智能体决策记忆（避免上一轮的经验污染本轮）
+    this._memorySyncedCount = 0;
+    this.advisor.clearMemory();
+    this.advisor.setPrevAdjustments(null);
     const toggle = document.getElementById('aiToggle');
     if (toggle) toggle.checked = false;
     this._toggleAI(false);
@@ -196,6 +232,9 @@ class App {
       </div>
     `;
 
+    // 决策前先把已模拟月份的实际效果写入智能体记忆，形成闭环
+    this._syncAdvisorMemory();
+
     const summary = this.sim.getSimulationSummary();
     const advice = await this.advisor.getAdvice(summary);
 
@@ -203,17 +242,15 @@ class App {
       this.lastAdvice = advice;
       resultEl.innerHTML = CargoAdvisor.formatAdviceHTML(advice);
 
-      if (advice.raw) {
-        this.lastAdjustments = CargoAdvisor.parseRawAdviceToAdjustments(advice.content);
-      } else {
-        this.lastAdjustments = advice.structured?.adjustments || {};
-      }
+      // DeepSeek 智能体与本地引擎均以结构化 adjustments 返回，无需再解析自然语言
+      this.lastAdjustments = advice.structured?.adjustments || {};
 
       this.ui.updateAdjustmentsPreview(this.lastAdjustments);
 
       const toggle = document.getElementById('aiToggle');
       if (toggle && toggle.checked) {
         this.sim.setAIAdjustments(this.lastAdjustments);
+        this.advisor.setPrevAdjustments(this.lastAdjustments);
         const statusText = document.getElementById('aiStatusText');
         const statusDot = document.getElementById('aiStatusBadge')?.querySelector('.status-dot');
         if (statusText) statusText.textContent = i18n.t('ai.status.on');
