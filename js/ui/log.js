@@ -32,6 +32,22 @@
       if (ev.type === 'merchant') {
         return `<div class="entry"><span class="month">${month}</span> 商人 <strong>${ev.name}</strong>：${ev.reason}</div>`;
       }
+      // Phase 1.5 新事件：分账 / 契约 / 破产 / 进场
+      if (ev.type === 'collude_split') {
+        return `<div class="entry collude"><span class="month">${month}</span> <strong>分账</strong>：${ev.merchantName} × ${ev.city}${ev.officialName}：避税 ${ev.evaded} 两，官得 ${ev.officialGet} 两（${Math.round(ev.share * 100)}%），商留 ${ev.merchantGet} 两</div>`;
+      }
+      if (ev.type === 'contract_made') {
+        return `<div class="entry collude"><span class="month">${month}</span> <strong>结契</strong>：${ev.detail}</div>`;
+      }
+      if (ev.type === 'contract_broken') {
+        return `<div class="entry rotation"><span class="month">${month}</span> <strong>废契</strong>：${ev.note}，${ev.merchantName} 须重新打点</div>`;
+      }
+      if (ev.type === 'bankruptcy') {
+        return `<div class="entry expose"><span class="month">${month}</span> <strong>歇业</strong>：${ev.note}</div>`;
+      }
+      if (ev.type === 'merchant_enter') {
+        return `<div class="entry"><span class="month">${month}</span> <strong>入行</strong>：${ev.note}</div>`;
+      }
       return `<div class="entry"><span class="month">${month}</span> ${JSON.stringify(ev)}</div>`;
     }
   };

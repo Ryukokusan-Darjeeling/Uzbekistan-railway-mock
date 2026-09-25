@@ -13,13 +13,17 @@
       const rows = officials.map((o) => {
         const cityName = (state.cities.find(c => c.id === o.city) || {}).name || o.city;
         const actionLabel = o.lastAction ? this._actionLabel(o.lastAction) : '—';
+        const sup = state.officials.find(x => x.id === o.superiorId);
+        const powerBar = `<span class="cku2-power-bar"><span class="cku2-power-fill" style="width:${Math.max(0, Math.min(100, o.powerIndex || 0))}%"></span></span>`;
         return `
           <div class="cku2-official">
             <span class="name">${o.name}</span>
             <span class="post">${o.post} · ${o.seat}</span>
-            <span style="font-size:0.78rem;color:var(--ink)">${cityName}</span>
-            <span class="wealth">私囊 ${Math.round(o.wealth)} 两</span>
+            <span class="cku2-rank-badge">${o.rankName || ''}</span>
+            <span style="font-size:0.78rem;color:var(--ink)">${cityName}${sup ? '（隶 ' + sup.name + '）' : ''}</span>
+            <span class="wealth">私囊 ${Math.round(o.wealth)} 两${o.lastTribute ? ` · 上月孝敬 ${Math.round(o.lastTribute)} 两` : ''}</span>
             <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--ink)">任期余 ${o.tenureRemaining} 月</span>
+            <span style="font-family:var(--font-mono);font-size:0.75rem;color:var(--ink);display:flex;align-items:center;gap:6px">含权量 ${o.powerIndex != null ? o.powerIndex.toFixed(0) : '—'} ${powerBar}</span>
           </div>
           <div style="font-size:0.75rem;color:var(--ink);padding:0 0 6px 24px">本月：${actionLabel}</div>
         `;
@@ -32,13 +36,19 @@
       const merchants = state.merchants;
       const rows = merchants.map((m) => {
         const routeName = (state.tradeLine.routes.find(r => r.id === m.route) || {}).name || '未选路';
+        const L = m.lastLedger;
+        const profitLine = L
+          ? `上月：运 ${L.shipment} 担，净 <span style="color:${L.profit >= 0 ? 'var(--leather-deep)' : 'var(--rust-red)'}">${L.profit >= 0 ? '+' : ''}${Math.round(L.profit)} 两</span>${L.bribePaid ? `（含打点 ${Math.round(L.bribePaid)} 两）` : ''}${L.loss ? `（途损 ${Math.round(L.loss)} 两）` : ''}`
+          : '上月：尚未开张';
+        const contractCount = (state.contracts || []).filter(c => c.merchantId === m.id).length;
         return `
           <div class="cku2-official">
             <span class="name">${m.name}</span>
             <span class="post">${m.origin}${m.isAI ? '（AI 代表）' : ''}</span>
-            <span style="font-size:0.78rem;color:var(--ink)">${routeName}</span>
+            <span style="font-size:0.78rem;color:var(--ink)">${routeName}${contractCount ? ` · ${contractCount} 处契约` : ''}</span>
             <span class="wealth">本金 ${Math.round(m.capital)} 两</span>
           </div>
+          <div style="font-size:0.75rem;color:var(--ink);padding:0 0 6px 24px">${profitLine}</div>
         `;
       }).join('');
 
@@ -115,7 +125,8 @@
         case 'embezzle': return `克扣 ${Math.round(action.amount)} 两${action.exposed ? '（已暴露）' : ''}`;
         case 'bribe': return `贿赂上司 ${Math.round(action.amount)} 两`;
         case 'placeRelative': return action.success ? '打点成功，亲族接班' : '打点接班失败';
-        case 'collude': return '与商人勾结分账';
+        case 'collude': return `与${action.target || '商人'}勾结分账`;
+        case 'tribute': return `孝敬 ${Math.round(action.amount)} 两${action.to ? ' → ' + action.to : ''}`;
         case 'idle': return '本月观望';
         default: return '—';
       }

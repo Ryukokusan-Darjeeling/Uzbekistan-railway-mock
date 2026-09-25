@@ -20,20 +20,53 @@
     { id: 'kiakhta',    name: '恰克图',   nameEn: 'Kiakhta',    lat: 50.4, lng: 106.5, type: 'border', role: '中俄口岸' }
   ];
 
-  // ---- 官缺候选池（清朝民族官缺，Phase 1 重点） ----
+  // ---- 官缺候选池（清朝民族官缺 + 史实品级，Phase 1.5） ----
+  // rankScore：品数×2 +（从品+1），仅用于比较（越小越高）
+  // superiorPost：制度性上级（陋规孝敬流向），null = 直辖督抚/无本线上级
   const OFFICIAL_SEATS = [
     // 恰克图（满缺为主，边疆）
-    { post: '恰克图办事司员', faction: '清·满', seat: '满缺', city: 'kiakhta',   level: 4 },
-    { post: '管理商民事务司员', faction: '清·汉军旗', seat: '汉缺', city: 'kiakhta', level: 3 },
+    { post: '恰克图办事司员', faction: '清·满', seat: '满缺', city: 'kiakhta',   level: 4,
+      rankName: '从四品', rankScore: 9, superiorPost: '钦差库伦办事大臣' },
+    { post: '管理商民事务司员', faction: '清·汉军旗', seat: '汉缺', city: 'kiakhta', level: 3,
+      rankName: '正五品', rankScore: 10, superiorPost: '钦差库伦办事大臣' },
     // 库伦（满缺 + 蒙缺）
-    { post: '钦差库伦办事大臣', faction: '清·满', seat: '满缺', city: 'kulun',     level: 5 },
-    { post: '库伦帮办大臣', faction: '清·蒙', seat: '蒙缺', city: 'kulun',     level: 4 },
+    { post: '钦差库伦办事大臣', faction: '清·满', seat: '满缺', city: 'kulun',     level: 5,
+      rankName: '视正二品', rankScore: 4, superiorPost: null },
+    { post: '库伦帮办大臣', faction: '清·蒙', seat: '蒙缺', city: 'kulun',     level: 4,
+      rankName: '从二品', rankScore: 5, superiorPost: '钦差库伦办事大臣' },
     // 张家口
-    { post: '察哈尔都统', faction: '清·满', seat: '满缺', city: 'zhangjiakou', level: 5 },
-    { post: '张家口同知', faction: '清·汉', seat: '汉缺', city: 'zhangjiakou', level: 3 },
+    { post: '察哈尔都统', faction: '清·满', seat: '满缺', city: 'zhangjiakou', level: 5,
+      rankName: '从一品', rankScore: 2, superiorPost: null },
+    { post: '张家口同知', faction: '清·汉', seat: '汉缺', city: 'zhangjiakou', level: 3,
+      rankName: '正五品', rankScore: 10, superiorPost: '察哈尔都统' },
     // 汉口（湖广总汇，汉缺为主）
-    { post: '汉黄德道（江汉关道）', faction: '清·汉', seat: '汉缺', city: 'hankou', level: 4 }
+    { post: '汉黄德道（江汉关道）', faction: '清·汉', seat: '汉缺', city: 'hankou', level: 4,
+      rankName: '正四品', rankScore: 8, superiorPost: null }
   ];
+
+  // ---- 含权量职务分（powerIndex 组成项） ----
+  const POWER_ROLE = {
+    hankou: 0.7,       // 集散港
+    fancheng: 0.4, sheqi: 0.4, taiyuan: 0.4,   // 转运
+    zhangjiakou: 1.0,  // 边关税关
+    kulun: 0.9, kiakhta: 0.9                   // 口岸互市
+  };
+
+  // ---- 商人现金流常量（Phase 1.5） ----
+  const TRADE = {
+    GOODS_VALUE: 20,        // 茶叶每担货值（两）
+    SELL_NET: 14,           // 到岸每担净得（两，已扣采购）
+    TRANSPORT_PER_COST: 0.3,// 每单位 baseCost 折 0.3 两/担运费
+    SHIP_MAX: 150,          // 单商队每月最大运量（担）
+    SHIP_MIN: 5,            // 最小起运量
+    RISK_LOSS_RATE: 0.5,    // 风险触发损失半货
+    SMUGGLE_RISK_ADD: 0.15, // 走私追加风险
+    COLLUDE_PAY_RATIO: 0.4, // 勾结城市实缴比例（40% 实缴，60% 为避税额分账标的）
+    BRIBE_RELIEF: 0.5,      // 打点生效城市税率减半
+    BRIBE_MIN_RATE: 0.25,   // 打点生效门槛：金额 ≥ 该城应缴税 × 此比例
+    BANKRUPT_LINE: 100,     // 本金低于此线破产
+    RESPAWN_DELAY: 3        // 破产后 3 个月新商人进场
+  };
 
   // 各族候选名池（符合民族命名习惯，非真实历史人物；池子够大 + pickName 查重保证在任者不重名）
   const CANDIDATE_POOL = {
@@ -102,10 +135,16 @@
       post: seat.post,
       city: seat.city,
       level: seat.level,
+      // 品级与含权量（Phase 1.5）
+      rankName: seat.rankName || '',
+      rankScore: seat.rankScore || 10,
+      powerIndex: 30,               // 初始含权量（每月结算后重算）
+      superiorId: null,             // 制度性上级（初始化时按 superiorPost 解析）
       // 私有状态
       wealth: 0,                    // 私囊（银两）
       politicalCapital: 50,         // 政治资本（0~100）
       tenureRemaining: TENURE_MONTHS,
+      lastTribute: 0,               // 上月孝敬支出（供 LLM 参考与 UI 显示）
       // 性格（0~1 归一）
       traits: {
         greed: rand(0.4, 0.95),
@@ -127,15 +166,17 @@
 
   function makeMerchant(origin, idx) {
     return {
-      id: `merchant_${origin}_${idx}`,
+      id: `merchant_${origin}_${idx}_${Date.now().toString(36).slice(-4)}${Math.floor(Math.random()*1000)}`,
       name: merchantName(origin, idx),
       origin,                        // 晋商 / 俄商 / 希腊商 ...
-      capital: rand(500, 3000),      // 本金（银两）
+      capital: rand(500, 3000),      // 本金（银两，随月度盈亏涨落）
       goods: ['茶叶'],               // Phase 1 仅茶叶
-      route: null,                   // 当前路线 id 序列
+      route: null,                   // 当前路线 id
       loyalty: null,                 // 依附的官员 id
       network: [],                   // 靠山/联系人
       isAI: false,                   // 是否 AI 代表商人
+      lastLedger: null,              // 上月账本 {shipment, revenue, transport, taxDue, taxPaid, bribePaid, loss, profit, colludeShare}
+      decision: null,                // 本月已应用决策（bribe/smuggle/collude 等）
       traits: {
         riskAverse: rand(0.3, 0.9),
         mobility: rand(0.3, 0.9),
@@ -146,8 +187,10 @@
 
   function merchantName(origin, idx) {
     const names = {
-      '晋商': ['乔致庸', '常万达', '渠本翘', '曹三喜', '雷履泰', '王相卿'],
-      '俄商': ['伊万·库兹涅佐夫', '彼得·斯米尔诺夫', '尼古拉·沃尔科夫', '瓦西里·波波夫'],
+      '晋商': ['乔致庸', '常万达', '渠本翘', '曹三喜', '雷履泰', '王相卿',
+             '范永斗', '亢嗣鼎', '尉光大', '侯荫昌', '冀以和', '霍履荣'],
+      '俄商': ['伊万·库兹涅佐夫', '彼得·斯米尔诺夫', '尼古拉·沃尔科夫', '瓦西里·波波夫',
+             '谢尔盖·莫罗佐夫', '阿列克谢·伊万诺夫'],
       '希腊商': ['乔治·帕帕多普洛斯', '康斯坦丁·马夫罗迪', '迪米特里·安格洛斯'],
       '意大利商': ['安东尼奥·罗西', '路易吉·费拉里', '乔瓦尼·科伦坡']
     };
@@ -155,11 +198,32 @@
     return pool[idx % pool.length];
   }
 
+  // ---- 商人进场取名：不与在任商人重名（沿用官员查重思路） ----
+  function pickMerchantName(origin, usedNames) {
+    const used = usedNames instanceof Set ? usedNames : new Set(usedNames || []);
+    // 组合池：该族全部候选
+    const variants = [];
+    const seen = new Set();
+    for (let i = 0; i < 12; i++) {
+      const n = merchantName(origin, i);
+      if (!seen.has(n)) { seen.add(n); variants.push(n); }
+    }
+    const avail = variants.filter(n => !used.has(n));
+    if (avail.length) return avail[Math.floor(Math.random() * avail.length)];
+    // 兜底：家号变体（分号/新记）
+    const fam = { '晋商': ['大兴', '永聚', '广盛', '天顺', '恒源'] }[origin] || ['号'];
+    for (const f of fam) {
+      const cand = `${variants[0].split('·')[0]}（${f}记）`;
+      if (!used.has(cand)) return cand;
+    }
+    return variants[0] + '（新）';
+  }
+
   function makeInitialState(config = {}) {
     const officials = [];
     const usedCityCount = {};
     const usedNames = new Set();          // 在任者姓名查重（硬性要求：不重名）
-    OFFICIAL_SEATS.forEach((seat) => {
+      OFFICIAL_SEATS.forEach((seat) => {
       const cityIdx = usedCityCount[seat.city] || 0;
       usedCityCount[seat.city] = cityIdx + 1;
       const o = makeOfficial(seat, cityIdx);
@@ -167,6 +231,15 @@
       if (usedNames.has(o.name)) o.name = pickName(seat.faction, usedNames);
       usedNames.add(o.name);
       officials.push(o);
+    });
+
+    // 解析制度性上下级（按 superiorPost → 官员 id）
+    officials.forEach((o) => {
+      const seat = OFFICIAL_SEATS.find(s => s.post === o.post);
+      if (seat && seat.superiorPost) {
+        const sup = officials.find(x => x.post === seat.superiorPost);
+        o.superiorId = sup ? sup.id : null;
+      }
     });
 
     // 商人：3 家晋商 + 1 家俄商（Phase 1），其中 1 家晋商为 AI 代表
@@ -195,6 +268,8 @@
       cities: PHASE1_CITIES,
       officials,
       merchants,
+      contracts: [],                   // 勾结契约 [{officialId, merchantId, cityId, sinceMonth}]
+      merchantRespawnQueue: [],        // 破产商人进场队列 [{dueMonthIndex, origin}]
       tradeLine: {
         routes: makeRoutes(),
         totalVolume: 100,              // 基准贸易量（单位：担/月）
@@ -279,8 +354,9 @@
 
   global.CKUState = {
     START_YEAR, TENURE_MONTHS, PHASE1_CITIES, OFFICIAL_SEATS, CANDIDATE_POOL,
+    POWER_ROLE, TRADE,
     makeInitialState, makeOfficial, makeMerchant,
-    pickName, genRelativeName,
+    pickName, genRelativeName, pickMerchantName,
     serialize, deserialize, setStorage, persist, restore
   };
 

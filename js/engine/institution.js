@@ -37,6 +37,20 @@
 
     // ---- 换官：离任带走财富 → 打点接班判定 → 新官上任 ----
     rotateOfficial(state, oldOfficial) {
+      // 0. 契约作废：该官名下所有勾结契约随人事更迭失效（Phase 1.5）
+      const broken = (state.contracts || []).filter(c => c.officialId === oldOfficial.id);
+      if (broken.length && Array.isArray(state.eventLog)) {
+        broken.forEach(c => {
+          const m = (state.merchants || []).find(x => x.id === c.merchantId);
+          state.eventLog.push({
+            type: 'contract_broken', officialId: oldOfficial.id, merchantId: c.merchantId,
+            merchantName: m ? m.name : c.merchantId,
+            note: `${oldOfficial.name} 离任，勾结契约作废`, monthIndex: state.meta.monthIndex
+          });
+        });
+      }
+      state.contracts = (state.contracts || []).filter(c => c.officialId !== oldOfficial.id);
+
       // 1. 考成评估
       const appraisal = this.appraise(oldOfficial, state);
       const tookWealth = oldOfficial.wealth; // 离任带走全部私囊
@@ -53,7 +67,7 @@
         successionNote = `按官缺（${successor.seat}）由候补 ${successor.name} 接任`;
       }
 
-      // 3. 替换
+      // 3. 替换（品级/上下级关系随官缺传递）
       const idx = state.officials.indexOf(oldOfficial);
       if (idx >= 0) {
         state.officials[idx] = successor;
@@ -75,11 +89,11 @@
 
     // ---- 考成：赋税达标 + 政绩 + 贪腐暴露度 → 升迁/平调/罢免 ----
     appraise(official, state) {
-      const taxTarget = 1.0;                       // 简化：达标基准
       const corruptionPenalty = official.exposed ? 40 : (official.wealth / 1000); // 私囊越多越危险
       let score = 50;                              // 基础分
       score -= corruptionPenalty * 0.5;
-      score += official.politicalCapital * 0.1;
+      // 含权量调制：高含权量者的政治资本更"值钱"（官官相护、考功司买账）
+      score += official.politicalCapital * 0.1 * (0.5 + (official.powerIndex || 30) / 100);
 
       if (score >= 60) return { result: 'promote', score };
       if (score >= 30) return { result: 'transfer', score };
@@ -101,9 +115,14 @@
         faction: oldOfficial.faction,
         seat: oldOfficial.seat,
         city: oldOfficial.city,
-        level: oldOfficial.level
+        level: oldOfficial.level,
+        rankName: oldOfficial.rankName,
+        rankScore: oldOfficial.rankScore,
+        superiorPost: null
       }, Math.floor(Math.random() * 1000));
       succ.name = name;
+      // 上下级随官缺传递
+      succ.superiorId = this._findSuperiorId(oldOfficial, state);
       return succ;
     },
 
@@ -121,13 +140,27 @@
         faction: oldOfficial.faction,
         seat: oldOfficial.seat,
         city: oldOfficial.city,
-        level: oldOfficial.level
+        level: oldOfficial.level,
+        rankName: oldOfficial.rankName,
+        rankScore: oldOfficial.rankScore,
+        superiorPost: null
       }, Math.floor(Math.random() * 100));
       succ.name = name;
       succ.relationships.push({ type: 'relative', to: oldOfficial.name });
       // 新官"还本压力"：急于回本，贪欲偏高
       succ.traits.greed = Math.min(0.99, succ.traits.greed + 0.15);
+      // 上下级随官缺传递
+      succ.superiorId = this._findSuperiorId(oldOfficial, state);
       return succ;
+    },
+
+    // ---- 按官缺的 superiorPost 查现任上级 id ----
+    _findSuperiorId(oldOfficial, state) {
+      const seat = S.OFFICIAL_SEATS.find(s => s.post === oldOfficial.post);
+      if (!seat || !seat.superiorPost) return null;
+      // 排除自身（旧官还在 officials 数组里）
+      const sup = state.officials.find(x => x.post === seat.superiorPost && x.id !== oldOfficial.id);
+      return sup ? sup.id : null;
     },
 
     // ---- 捐纳打点：官员花费财富，尝试安插亲戚为下一任 ----
@@ -160,9 +193,23 @@
         }
         case 'embezzle': {
           // 克扣：金额不得超过其可接触税基，且过大会提升暴露风险
-          const risk = action.amount / 500;
+          // 含权量调制：高含权量官官相护，更难暴露（powerIndex 0~100 → 概率 × 0.5~1.0）
+          const risk = (action.amount / 500) * (1 - (official.powerIndex || 30) / 200);
           official.exposed = official.exposed || Math.random() < risk;
           return { legal: true, exposed: official.exposed };
+        }
+        case 'tribute': {
+          // 孝敬上级（陋规，LLM 自主判断）：财富转移，双方政治资本微调
+          const sup = state.officials.find(o => o.id === (official.superiorId || action.target));
+          if (!sup) return { legal: false, note: '无上级可孝敬' };
+          if (official.wealth < action.amount) return { legal: false, note: '财富不足' };
+          if (action.amount <= 0) return { legal: false, note: '金额无效' };
+          official.wealth -= action.amount;
+          sup.wealth += action.amount;
+          official.politicalCapital = Math.min(100, official.politicalCapital + action.amount / 400);
+          sup.politicalCapital = Math.min(100, sup.politicalCapital + action.amount / 600);
+          official.lastTribute = action.amount;
+          return { legal: true, superiorName: sup.name };
         }
         case 'bribe': {
           // 贿赂上司：花费财富换取政治资本

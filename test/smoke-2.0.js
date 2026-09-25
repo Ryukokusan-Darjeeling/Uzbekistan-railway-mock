@@ -61,9 +61,21 @@ async function main() {
 
   // 2. 规则模式推进 40 回合（触发换官）
   state.params.officialAIMode = 'rule';
+  // 现金流守恒记录：每回合验证官得+商留=避税额
+  let splitConserved = true, splitCount = 0;
+  const origSettle = global.CKUEconomy.settle.bind(global.CKUEconomy);
+  global.CKUEconomy.settle = function (st) {
+    const r = origSettle(st);
+    (r.colludeSplits || []).forEach(s => {
+      splitCount++;
+      if (Math.abs(s.officialGet + s.merchantGet - s.evaded) > 0.02) splitConserved = false;
+    });
+    return r;
+  };
   for (let i = 0; i < 40; i++) {
     await Orchestrator.step(state);
   }
+  global.CKUEconomy.settle = origSettle;
 
   // 3. 验证换官事件发生
   const rotations = state.eventLog.filter(e => e.type === 'rotation');
@@ -72,6 +84,44 @@ async function main() {
   const names40 = state.officials.map(o => o.name);
   assert.strictEqual(new Set(names40).size, names40.length, `40 回合后在任官员姓名必须唯一：${names40.join('、')}`);
   console.log(`✓ 40 回合推进完成，发生 ${rotations.length} 次换官，在任者姓名无重复`);
+
+  // 3.5 Phase 1.5 断言
+  // 分账守恒
+  assert.ok(splitConserved, `分账守恒被破坏（共 ${splitCount} 笔）`);
+  console.log(`✓ 勾结分账守恒：${splitCount} 笔分账，官得+商留=避税额`);
+  // 品级与含权量
+  state.officials.forEach(o => {
+    assert.ok(o.rankName, `官员 ${o.name} 应有品级名`);
+    assert.ok(typeof o.powerIndex === 'number' && o.powerIndex >= 0 && o.powerIndex <= 100,
+      `官员 ${o.name} 含权量 ${o.powerIndex} 应在 0-100`);
+  });
+  const tongzhi = state.officials.find(o => o.post === '张家口同知');
+  const dutong = state.officials.find(o => o.post === '察哈尔都统');
+  assert.ok(tongzhi && dutong && tongzhi.superiorId === dutong.id, '张家口同知应隶察哈尔都统');
+  console.log(`✓ 品级/含权量/上下级：${dutong.rankName}（含权量 ${dutong.powerIndex}）→ ${tongzhi.rankName}（含权量 ${tongzhi.powerIndex}）`);
+  // 商人账本与本金变化
+  const withLedger = state.merchants.filter(m => m.lastLedger);
+  assert.ok(withLedger.length > 0, '商人应有月度账本');
+  withLedger.forEach(m => {
+    const L = m.lastLedger;
+    const expect = L.revenue - L.transport - L.taxPaid - L.bribePaid - L.loss;
+    assert.ok(Math.abs(expect - L.profit) < 0.02, `商人 ${m.name} 账目应平衡（${expect} vs ${L.profit}）`);
+  });
+  console.log(`✓ 商人现金流账目平衡（${withLedger.length} 家有账本）`);
+  // 破产/进场事件（若发生）
+  const bankruptcies = state.eventLog.filter(e => e.type === 'bankruptcy').length;
+  const enters = state.eventLog.filter(e => e.type === 'merchant_enter').length;
+  console.log(`✓ 破产 ${bankruptcies} 次 / 新商人入行 ${enters} 次${bankruptcies > 0 ? '（破产机制已触发）' : ''}`);
+  // 换官契约作废
+  const brokenContracts = state.eventLog.filter(e => e.type === 'contract_broken').length;
+  const madeContracts = state.eventLog.filter(e => e.type === 'contract_made').length;
+  console.log(`✓ 契约建立 ${madeContracts} 次 / 换官废契 ${brokenContracts} 次`);
+  // 存活契约的官员必须在任
+  (state.contracts || []).forEach(c => {
+    assert.ok(state.officials.some(o => o.id === c.officialId), '存活契约的官员应在任');
+    assert.ok(state.merchants.some(m => m.id === c.merchantId), '存活契约的商人应在世');
+  });
+  console.log(`✓ 现存契约 ${state.contracts.length} 份，均有效`);
 
   // 4. 验证经济结算产生数据
   assert.ok(state.metrics.tradeHealth.length === 40, '贸易健康度应有 40 个数据点');

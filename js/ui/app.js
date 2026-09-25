@@ -150,7 +150,8 @@
       case 'embezzle': return `克扣 ${Math.round(decision.amount)} 两${decision.exposed ? '（贪腐暴露）' : ''}`;
       case 'bribe': return `贿赂上司 ${Math.round(decision.amount)} 两`;
       case 'placeRelative': return decision.success ? '打点成功，亲族将接班' : '打点接班（未成）';
-      case 'collude': return '与过境商人勾结分账';
+      case 'collude': return `与${decision.target || '过境商人'}结成勾结契约`;
+      case 'tribute': return `孝敬上级 ${Math.round(decision.amount || 0)} 两`;
       case 'route': return '改走更划算的路线';
       case 'bribe2': return '行贿买通关隘';
       case 'smuggle': return '走私绕卡';

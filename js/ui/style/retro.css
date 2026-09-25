@@ -95,6 +95,38 @@
   transform: none;
 }
 
+/* 品级徽记（Phase 1.5）：小方章 */
+.cku2-rank-badge {
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  color: var(--parchment-light);
+  background: var(--leather-dark);
+  border-radius: 3px;
+  padding: 1px 5px;
+  letter-spacing: 0.05em;
+}
+/* 含权量条 */
+.cku2-power-bar {
+  display: inline-block;
+  width: 72px;
+  height: 7px;
+  background: rgba(60,36,21,0.14);
+  border: 1px solid rgba(60,36,21,0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.cku2-power-fill {
+  display: block;
+  height: 100%;
+  background: var(--brass);
+}
+/* 日志分账条目 */
+.cku2-log .entry.collude {
+  border-left: 3px solid var(--brass);
+  padding-left: 8px;
+  margin-left: 2px;
+}
+
 /* 主网格 */
 .cku2-main {
   display: grid;
