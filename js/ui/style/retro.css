@@ -1,0 +1,365 @@
+/* ============================================
+   style/retro.css — 2.0 复古 UI（羊皮纸 + 黄铜 + 氧化铜）
+   19 世纪复古地图 / 蒸汽工业风 · 全站禁用 emoji
+   ============================================ */
+
+:root {
+  /* 配色 */
+  --parchment: #F4E8C1;
+  --parchment-light: #FFF8E7;
+  --parchment-dark: #D4C5A0;
+  --brass: #B87333;
+  --brass-light: #C8A84E;
+  --verdigris: #43B3AE;
+  --leather-dark: #3C2415;
+  --leather-deep: #4E1E0E;
+  --rust-red: #8B3A1A;
+  --ink: #704214;
+
+  /* 语义色（中国股市习惯沿用：红涨绿跌，此处红色=警示/税收） */
+  --danger: #8B3A1A;
+  --ok: #43B3AE;
+
+  /* 字体 */
+  --font-display: 'Cinzel', 'Playfair Display', 'Times New Roman', serif;
+  --font-body: 'Spectral', 'Georgia', serif;
+  --font-mono: 'Special Elite', 'Courier Prime', 'Courier New', monospace;
+}
+
+.cku2-app {
+  background: var(--parchment);
+  color: var(--leather-dark);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  padding: 16px;
+  /* 羊皮纸纹理：CSS 渐变模拟 */
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(184,115,51,0.06) 0, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(67,179,174,0.05) 0, transparent 40%),
+    repeating-linear-gradient(45deg, rgba(112,66,20,0.015) 0 2px, transparent 2px 4px);
+}
+
+/* 标题区 */
+.cku2-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border: 2px solid var(--brass);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--parchment-light), var(--parchment-dark));
+  box-shadow: 0 2px 0 rgba(60,36,21,0.3), inset 0 1px 0 rgba(255,255,255,0.6);
+  margin-bottom: 16px;
+}
+
+.cku2-header h1 {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  letter-spacing: 0.06em;
+  color: var(--leather-deep);
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.cku2-header .reign {
+  font-family: var(--font-mono);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.cku2-header .controls button {
+  font-family: var(--font-body);
+  background: linear-gradient(180deg, var(--brass-light), var(--brass));
+  color: var(--parchment-light);
+  border: 1px solid var(--leather-dark);
+  border-radius: 4px;
+  padding: 8px 14px;
+  margin-left: 8px;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  box-shadow: 0 2px 0 rgba(60,36,21,0.4);
+  transition: transform 0.05s;
+}
+.cku2-header .controls button:hover { filter: brightness(1.05); }
+.cku2-header .controls button:active { transform: translateY(1px); box-shadow: 0 1px 0 rgba(60,36,21,0.4); }
+.cku2-header .controls button.ghost {
+  background: transparent;
+  color: var(--leather-dark);
+  border-color: var(--brass);
+}
+/* 推进进行中：禁用态（半透明 + 无指针 + 保持文字可读） */
+.cku2-header .controls button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+  filter: none;
+  transform: none;
+}
+
+/* 主网格 */
+.cku2-main {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 16px;
+}
+
+/* 卡片 */
+.cku2-card {
+  background: var(--parchment-light);
+  border: 2px solid var(--parchment-dark);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 6px rgba(60,36,21,0.15);
+  position: relative;
+}
+/* 黄铜铆钉装饰 */
+.cku2-card::before {
+  content: '';
+  position: absolute;
+  top: 6px; left: 6px; right: 6px; bottom: 6px;
+  border: 1px dashed rgba(184,115,51,0.25);
+  border-radius: 5px;
+  pointer-events: none;
+}
+.cku2-card h2 {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--leather-deep);
+  border-bottom: 2px solid var(--brass);
+  padding-bottom: 6px;
+  margin: 0 0 12px;
+  letter-spacing: 0.04em;
+}
+
+/* 地图容器（Leaflet）：#cku2Map 自身被 Leaflet 初始化为 leaflet-container */
+.cku2-map {
+  overflow: hidden;
+  padding: 0 !important;      /* 覆盖卡片 padding，让地图铺满 */
+  height: 520px;              /* Leaflet 需要容器有明确高度 */
+  position: relative;
+  z-index: 0;
+}
+.cku2-map::before {
+  display: none;              /* 去掉卡片装饰虚线框，避免干扰地图 */
+}
+.cku2-map.leaflet-container {
+  height: 520px;
+  width: 100%;
+  border-radius: 6px;
+  background: var(--parchment);
+}
+.cku2-map .cku2-map-attribution {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink);
+  opacity: 0.75;
+  text-align: right;
+  padding: 4px 8px;
+}
+.cku2-map .cku2-map-attribution a {
+  color: var(--brass);
+  text-decoration: none;
+}
+
+/* 商路节点标签（permanent tooltip，无 emoji） */
+.cku2-node-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: bold;
+  color: #3C2415;
+  background: rgba(255,248,231,0.9) !important;
+  border: 1px solid var(--parchment-dark);
+  border-radius: 2px;
+  padding: 1px 4px;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(60,36,21,0.3);
+}
+.cku2-node-label::before {
+  border-top-color: rgba(255,248,231,0.9) !important;
+}
+
+/* 事件日志 */
+.cku2-log {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  max-height: 420px;
+  overflow-y: auto;
+  line-height: 1.7;
+}
+.cku2-log .entry {
+  border-bottom: 1px solid rgba(184,115,51,0.2);
+  padding: 4px 0;
+}
+.cku2-log .entry .month {
+  color: var(--rust-red);
+  font-weight: bold;
+}
+.cku2-log .entry.rotation { color: var(--leather-deep); }
+.cku2-log .entry.expose { color: var(--danger); }
+
+/* 官员面板 */
+.cku2-official {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(184,115,51,0.25);
+}
+.cku2-official .name {
+  font-family: var(--font-display);
+  font-weight: bold;
+  color: var(--leather-dark);
+  min-width: 130px;
+}
+.cku2-official .post {
+  font-family: var(--font-mono);
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+.cku2-official .wealth {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  color: var(--rust-red);
+}
+
+/* 参数旋钮 */
+.cku2-params label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--ink);
+  margin: 8px 0 4px;
+}
+.cku2-params input[type=range] {
+  width: 100%;
+  accent-color: var(--brass);
+}
+
+/* 图例 */
+.cku2-legend {
+  display: flex;
+  gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink);
+  flex-wrap: wrap;
+}
+.cku2-legend .line-land { display: inline-block; width: 24px; height: 0; border-top: 2px solid var(--rust-red); margin-right: 4px; }
+.cku2-legend .line-border { display: inline-block; width: 24px; height: 0; border-top: 2px dashed var(--verdigris); margin-right: 4px; }
+
+/* 表盘加载动画（替代 emoji） */
+.cku2-gear {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border: 3px solid var(--brass);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: cku2-spin 1s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes cku2-spin { to { transform: rotate(360deg); } }
+
+/* ===== 智能体决策流（回合推进时的交流/决策时间线） ===== */
+.cku2-agent-stream {
+  background: var(--parchment-light);
+  border: 2px solid var(--brass);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  max-height: 260px;
+  overflow-y: auto;
+  font-family: var(--font-body);
+  box-shadow: 0 2px 6px rgba(60,36,21,0.15);
+}
+.cku2-agent-stream-title {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--leather-deep);
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(184,115,51,0.35);
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+}
+.cku2-agent-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+  border-bottom: 1px dashed rgba(184,115,51,0.2);
+  animation: cku2-fadein 0.25s ease;
+}
+.cku2-agent-entry:last-child { border-bottom: none; }
+.cku2-agent-entry.thinking .cku2-agent-thinking {
+  color: var(--ink);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+.cku2-agent-entry.done .cku2-agent-result {
+  color: var(--leather-dark);
+  font-size: 0.88rem;
+}
+.cku2-agent-entry.done .cku2-agent-result {
+  color: var(--rust-red);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+.cku2-agent-who {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.cku2-agent-who strong {
+  font-family: var(--font-display);
+  color: var(--leather-deep);
+  font-size: 0.9rem;
+}
+.cku2-agent-post {
+  font-family: var(--font-mono);
+  color: var(--ink);
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+.cku2-agent-check {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  position: relative;
+}
+.cku2-agent-check::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 1px;
+  width: 6px;
+  height: 10px;
+  border: solid var(--ok);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+@keyframes cku2-fadein {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 错误卡片 */
+.cku2-error {
+  background: var(--rust-red);
+  color: var(--parchment-light);
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin: 8px 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+.cku2-error button {
+  background: var(--parchment-light);
+  color: var(--rust-red);
+  border: none;
+  border-radius: 3px;
+  padding: 4px 10px;
+  margin-left: 8px;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
