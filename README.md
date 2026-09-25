@@ -1,136 +1,118 @@
-# CKU Railway Economic Simulator (Uzbekistan-railway-mock)
+# 欧亚茶路 · 清流官博弈沙盒（CKU Railway 2.0）
 
-A premium, interactive, and intelligent web-based economic simulation dashboard for the **China-Kyrgyzstan-Uzbekistan (CKU) Railway**. This simulator models dynamic cargo flows, seasonal market fluctuations, regional revenue sharing, and leverages both a **Local Rule-Based Expert System** and a **Multi-Agent LLM Dispatch Pipeline (DeepSeek)** to provide predictive dispatch suggestions.
+> 原 CKU Railway Economic Simulator 已演进为 **2.0 多智能体博弈沙盒**——一条贯穿「清帝国 → 俄国 → 奥斯曼帝国 → 奥地利」的真实欧亚茶路，看一群自私的地方官员在各自制度下谋私、换任、打点，看商人穿梭其中、商路兴衰。
 
----
-
-## 🌟 Key Features
-
-### 1. Advanced Simulation Engine
-- **Monte Carlo Random Simulation**: Stochastic volume and price sampling combined with deterministic growth trends.
-- **Multiplicative Seasonal Decomposition**: Modulates monthly volumes based on real-world seasonality indexes (0.7 ~ 1.4) across six major cargo types.
-- **Price Volatility Model**: Simulates random market uncertainty by introducing ±15% price fluctuations.
-- **Regional Revenue Split**: Automatically distributes revenue based on rail line segment lengths:
-  - **China Section** (213 km / 30% revenue share)
-  - **Kyrgyzstan Section** (300 km / 25% revenue share)
-  - **Uzbekistan Section** (60 km / 15% revenue share)
-  - **Europe Connection** (~4,000 km / 30% revenue share)
-
-### 2. Dual-Core AI Cargo Dispatch Advisor
-- **Local Rule Engine**: Analyzes seasonal factors and recent monthly cargo performance using heuristics to recommend optimal volume adjustments (Top 2 increased by +15-20%, Bottom 1 reduced by -10-15%). Serves as both the offline fallback and the A/B comparison baseline.
-- **Multi-Agent Dispatch Pipeline (DeepSeek, default mode)**: Three role agents run as a sequential pipeline over the **DeepSeek API** (`deepseek-flash`), communicating exclusively through validated JSON contracts:
-  1. **Market Analyst** — compresses raw monthly data into a market brief (trend, opportunities, risks, season outlook);
-  2. **Dispatch Planner** — turns the brief plus decision memory into a draft plan (recommendations + volume multipliers);
-  3. **Risk Officer** — reviews the draft with an **approve / modify / reject** verdict; review comments are injected into the final strategy.
-- **Single-Agent Mode**: The original one-shot JSON decision agent is fully preserved — switchable in the UI for A/B comparison and as a lighter alternative.
-- **Robustness Engineering**: Each stage has a 60s timeout (AbortController) plus one retry, and degrades independently (analyst failure → planner uses raw data; risk officer failure → draft adopted as-is). All final multipliers pass through **code-enforced guardrails** (clamped to 0.75~1.30, max ±10% change per month) regardless of LLM output. API failures surface as a categorized **error card with retry / local-engine buttons** — never a silent fallback.
-- **Closed-Loop Decision Memory**: Every applied adjustment's actual revenue outcome vs. baseline is recorded (persisted in localStorage, up to 12 months) and injected into future prompts, so the agents learn from their own track record.
-- **Live Pipeline Timeline UI**: Watch the three stages light up in sequence (pending → running → done/failed), with a pipeline badge on the advice card summarizing the review verdict.
-- **Side-by-Side Strategy Sandbox**: Simulates both the "AI-Adopted" and "Baseline (No-AI)" scenarios concurrently, offering interactive differential analysis charts (Revenue Gain, Change Rate).
-
-### 3. High-Fidelity UI & Interactions
-- **Leaflet.js GIS Interactive Map**: Features dynamic route path highlights, segment hover popups, and click-to-focus regional cargo breakdown cards.
-- **Fully Animated Charts**: Live month-over-month trendlines, cargo distribution doughnuts, and comparative line charts built with **Chart.js**.
-- **Real-Time Dynamic Language Switcher (EN/ZH)**: Instantly translates the entire application (including active charts, tables, numbers, maps, and even the local AI advisor's recommendations) with smooth, interactive transitions.
-- **Image Export Tool**: Features an HTML5 Canvas drawing suite to compile comparative charts, titles, and timestamps into exportable PNG reports.
+玩家以**旁观者**身份观察：自私官员不是通力协作、谋求全局最优，而是各自在任期内钻制度空子、榨取私利，最终浮现出"这条商道被谁、以何种方式、抽成了什么样子"。
 
 ---
 
-## 🛠️ Simulation Algorithm
+## 核心机制
 
-The mathematical foundation of the simulation runs as follows for each cargo type $i$ at month $t$:
+### 真实地理与制度（写实）
+| 政权 | 制度原型 | 官员动机 |
+|---|---|---|
+| 清帝国 | 流官制 + 回避 + 捐纳 + 考成 | 短期掠夺、对上负责 |
+| 俄国 | 职级表（14 级）+ 军功晋升 | 向上抢功、忠于沙皇 |
+| 奥斯曼 | 包税制 iltizam / malikane | 过度榨取、可能世袭 |
+| 奥地利 | 开明专制 + 重商主义 | 国家经理人、国库至上 |
 
-$$\text{Volume}_i(t) = U(V_{\text{min}}, V_{\text{max}}) \times S_i[\text{month}] \times (1 + g_i)^t \times M_i$$
+Phase 1 已落地清朝段：**汉口 → 樊城 → 赊旗 → 太原 → 张家口 → 库伦 → 恰克图**。
 
-$$\text{Price}_i(t) = P_{\text{base}} \times U(0.85, 1.15) \times (1 + g_i)^t \times 0.5$$
+### 自私官员
+- 每个官员有私有状态：财富（私囊）、政治资本、剩余任期（36 月一任）、性格（贪欲/避险/忠诚/胆量）、目标函数（财富 + 政治资本 + 家族延续 + 人身安全 − 风险）。
+- 可执行动作（由制度引擎裁决合法性）：加税、克扣、贿赂上司、捐纳打点安插亲戚、与商人勾结。
+- **民族官缺**：清朝严格区分满缺/汉缺/蒙缺，边疆口岸以满蒙大臣为主，换官按官缺从对应民族候选池抽取接班人。
 
-$$\text{Revenue}_i(t) = \text{Volume}_i(t) \times \text{Price}_i(t)$$
+### 商人变量
+规则驱动的理性套利者 + 少量 AI 代表。被加税则绕道/行贿/走私，形成"陆路被抽干 → 商队改道 → 陆路口岸衰落"的历史重演。
 
-Where:
-- $U(A, B)$ represents a uniform random value sampled between $A$ and $B$.
-- $S_i[\text{month}]$ is the month-specific seasonal index for cargo $i$.
-- $g_i$ is the compound monthly growth rate (ranging from 1.0% to 3.5% based on cargo maturity).
-- $M_i$ is the **AI Dispatch Volume Multiplier** (default is $1.0$, adjusted to $0.75 \sim 1.30$ under AI control).
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-To run this application locally, you only need a modern web browser and a simple local HTTP server (since some features like Leaflet.js maps and modules work best under server environments).
-
-### Quick Launch
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/Ryukokusan-Darjeeling/Uzbekistan-railway-mock.git
-   cd Uzbekistan-railway-mock
-   ```
-
-2. **Start a local HTTP server**:
-   
-   - **Using Python (Recommended)**:
-     ```bash
-     python -m http.server 8000
-     ```
-   
-   - **Using Node.js**:
-     ```bash
-     npm install -g http-server
-     http-server -p 8000
-     ```
-
-3. **Open the browser**:
-   Navigate to `http://localhost:8000` to launch the simulator.
-
-### DeepSeek API Key (optional, enables LLM agents)
-
-Without a key, the simulator runs on the local rule engine. To enable the LLM agents, either:
-
-- **Paste the key in the UI** input field (session-only), or
-- **Configure it locally** — create `js/config.local.js` (already gitignored):
-  ```js
-  window.DEEPSEEK_API_KEY = 'sk-your-key-here';
-  ```
-  Get a key at [platform.deepseek.com](https://platform.deepseek.com).
+### 换官与打点
+三年一任到期触发换官：离任带走全部私囊 → 若在任内"打点"成功，亲族接班（带还本压力、急于回本）→ 形成周期性剥削节奏。
 
 ---
 
-## 🤖 Multi-Agent Architecture
+## 技术架构（可迁移设计）
 
 ```
-Monthly simulation data
-        │
-        ▼
-① Market Analyst ──► market brief (JSON)
-        │
-        ▼
-② Dispatch Planner ──► draft plan (JSON)  ◄── decision memory (past outcomes)
-        │
-        ▼
-③ Risk Officer ──► verdict: approve / modify / reject (JSON)
-        │
-        ▼
-Code guardrails (clamp 0.75~1.30, ±10%/month) ──► volume multipliers M_i
-        │
-        ▼
-Next month simulation ──► actual vs baseline revenue ──► back into decision memory
+js/engine/   纯逻辑，禁止 document/window/localStorage/DOM（3.0 整体迁 Python）
+  state.js        状态定义 + 序列化（纯 JSON）
+  llm.js          callLLM(role, prompt) 单一接口 + 错误归一化
+  institution.js  制度引擎（任期/换官/回避/捐纳/考成）
+  economy.js      经济引擎（商人选路/税基/成本/风险）
+  agents.js       智能体角色（官员/商人决策）
+  orchestrator.js 回合调度器
+js/ui/       渲染与交互，只读 engine 状态
+  map.js          SVG 世界地图底图 + 商路 + 罗盘玫瑰
+  panel.js        官员/商人/指标/参数面板
+  log.js          事件日志
+  app.js          主入口（唯一碰 DOM 的边界）
+  style/retro.css 羊皮纸 + 黄铜复古样式
 ```
 
-- **Orchestration**: `js/app.js` sequences the stages; all roles share one DeepSeek client with per-stage 60s timeout + 1 retry.
-- **Contracts**: each role has a dedicated system prompt and strict JSON schema; outputs are field-validated before entering the next stage.
-- **Failure handling**: analyst failure → planner uses raw data; risk officer failure → draft adopted as-is; planner failure / timeout → categorized error card with **Retry** and **Use local engine** buttons.
+**回合循环**：制度推进 → 经济结算 → 角色决策 → 制度裁决 → 经济更新 → 指标记录。
+
+### API 错误处理（不自动降级）
+
+AI 模式下，任何 LLM 调用失败（超时 / HTTP 错误 / 解析失败）都会：
+1. 在 `llm.js` 归一化为 `timeout | http | parse | unknown` 四类错误；
+2. 在 `orchestrator.js` 附带失败角色上下文（哪个官员/商人），上抛；
+3. 在 UI 渲染**错误卡片**，显示错误类型 + 角色名，提供「重试」按钮；
+4. 推进前做状态快照，失败时**回滚**，避免留下"半推进"的不一致状态。
+
+**不会静默降级到本地规则引擎**。规则模式仅当你主动在「观察参数」里把"官员决策模式"切到"规则驱动（对照基线）"时生效。
 
 ---
 
-## 👥 Authorship & Open Source
+## 运行
 
-This project is created and maintained with ❤️ by **Darjeeling**.
+```bash
+# 任选其一启动静态服务器
+python -m http.server 8000
+# 或
+npx http-server -p 8000
+```
 
-- **Author**: Darjeeling
-- **GitHub Repository**: [Ryukokusan-Darjeeling / Uzbekistan-railway-mock](https://github.com/Ryukokusan-Darjeeling/Uzbekistan-railway-mock.git)
-- **License**: MIT License - feel free to fork, customize, and experiment!
+访问 `http://localhost:8000`。
+
+### DeepSeek API Key（启用 LLM 智能体）
+
+Key 从本地 `js/config.local.js`（已 gitignore）读取：
+
+```js
+window.DEEPSEEK_API_KEY = 'sk-your-key-here';
+```
+
+获取 Key：<https://platform.deepseek.com>。
+
+无 Key 时可在「观察参数」中切换为"规则驱动"模式，仍可观察完整博弈循环（官员按性格 + 任期做确定性决策）。
 
 ---
 
-*Disclaimer: All economic figures, cargo growth ratios, and seasonal factors modeled in this application are for simulation and academic visualization purposes, extrapolated based on historic China-Europe freight railway statistics.*
+## 测试
+
+```bash
+node test/smoke-2.0.js
+```
+
+验证：初始化 + 民族官缺分布、40 回合换官、经济结算指标、商人选路、序列化往返、AI 模式失败显式抛错。
+
+---
+
+## 路线图
+
+- **Phase 1（已完成）**：清朝段原型（汉口—恰克图），三年流官 + 自私官员 + 商人绕行 + 复古 UI。
+- **Phase 2**：商人完整生态（多帮派、行贿、走私、勾结），陆路 vs 海路竞争（敖德萨支线）。
+- **Phase 3**：四地区齐 + 过境博弈（俄国/奥斯曼/奥地利制度对撞，完整连通图）。
+- **Phase 4**：高级机制（换官/打点/家族多代、三方勾结、全局事件）。
+
+详见 [docs/CKU-Railway-2.0-Architecture.md](docs/CKU-Railway-2.0-Architecture.md)。
+
+---
+
+## 作者与许可
+
+- **作者**：Darjeeling
+- **仓库**：<https://github.com/Ryukokusan-Darjeeling/Uzbekistan-railway-mock>
+- **许可**：MIT
+
+*免责声明：本应用为历史制度与博弈的沙盒模拟，所有地名、国名、职衔取自真实历史，官员姓名采用符合民族命名习惯的示例名（非真实历史人物）；经济数字为模拟与学术可视化用途。*
